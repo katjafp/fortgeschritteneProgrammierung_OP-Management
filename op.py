@@ -42,26 +42,23 @@ class OPSaal:
         neue Operationen geplant werden könnten, unter Berücksichtigung der Reinigungszeit.
         """
 
-        nutzbare_gesamtzeit = 0
-        aktueller_zeitpunkt = 0  # Start bei Minute 0 (z.B. 08:00 Uhr)
+        if not self.geplante_ops:
+            # Wenn der Saal komplett leer ist, können wir die vollen 480 Minuten nutzen
+            return self.kapazitaet_minute
 
-        # durchgehen aller geplanten OPs
+        belegte_zeit = 0
         for op in self.geplante_ops:
-            if op.start_minute > aktueller_zeitpunkt:
-                freie_dauer = op.start_minute - aktueller_zeitpunkt
-                if freie_dauer > self.reinigung:
-                    nutzbare_gesamtzeit += (freie_dauer - self.reinigung)
-            
-            # OP Saal ist erst nach der Reinigungszeit wieder frei
-            aktueller_zeitpunkt = op.end_minute + self.reinigung
+            op_dauer = op.end_minute - op.start_minute
+            # Jede OP blockiert den Saal für ihre Dauer + die Reinigung danach
+            belegte_zeit += (op_dauer + self.reinigung)
 
-        # Prüfen, ob nach der letzter OP bis Saal-Ende noch eine Lücke ist
-        if aktueller_zeitpunkt < self.kapazitaet_minute:
-            freie_dauer = self.kapazitaet_minute - aktueller_zeitpunkt
-            if freie_dauer > self.reinigung:
-                nutzbare_gesamtzeit += (freie_dauer - self.reinigung)
-
-        return nutzbare_gesamtzeit
+        # Die verbleibende reine OP-Zeit ist die Gesamtkapazität minus die belegte Zeit
+        restzeit = self.kapazitaet_minute - belegte_zeit
+        
+        # Da wir nach der allerletzten OP des Tages keine neue OP mehr planen, 
+        # steht uns die Reinigungszeit dieser letzten OP eigentlich wieder als Puffer zur Verfügung.
+        # Aber um sicherzugehen, dass wir nicht überziehen, ist 'restzeit' der sicherste Wert.
+        return max(0, restzeit)
 
         """Berechnet die Summe aller echt NUTZBAREN Operations-Minuten in den Lücken."""
         fenster = self.finde_freie_zeitfenster()
