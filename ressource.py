@@ -12,22 +12,29 @@ class Ressource:
     """Basisklasse für alle Entitäten (Personal, Geräte), die für eine OP blockiert werden."""
     def __init__(self, name: str):
         self.name: str = name
-        self.verfuegbar: bool = True
-        self.eingesetzt_in_op: str = ""
+        #geplante OPs für Ressource mit Zeitstempel
+        self.geplante_ops: list[dict]=[]
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
         """Prüft, ob die Ressource im angeforderten Zeitraum einsatzbereit ist."""
-        return self.verfuegbar
+        #wir gehen alle OPs durch die schon im k
+        for op in self.geplante_ops:
+            if von_minute < op["bis"] and bis_minute > op["von"]:
+                return False
+        return True
 
-    def blockieren(self, op_name: str) -> None:
+    def blockieren(self, op_name: str, von_minute: int, bis_minute: int) -> None:
         """Reserviert die Ressource für eine bestimmte Operation."""
-        self.verfuegbar = False
-        self.eingesetzt_in_op = op_name
+        karteikarte = {
+            "name": op_name,
+            "von": von_minute,
+            "bis": bis_minute
+        }
+        self.geplante_ops.append(karteikarte)
 
-    def freigeben(self) -> None:
+    def freigeben(self, op_name:str) -> None:
         """Macht die Ressource nach der OP wieder für das System verfügbar."""
-        self.verfuegbar = True
-        self.eingesetzt_in_op = ""
+        self.geplante_ops = [op for op in self.geplante_ops if op["name"] != op_name]
 
 
 class Instrument(Ressource):
