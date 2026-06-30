@@ -37,8 +37,9 @@ class OPManager:
     def plane_operation(self, op_name: str, saal_id: str, start_minute: int) -> None:
         """
         Prüft die Verfügbarkeit von Saal und Ressourcen und bucht die OP in den Zeitstrahl ein, wenn
-        alle Ressouircen verfügbar sind. """
-        """Kernprozess:
+        alle Ressouircen verfügbar sind.
+        
+        Kernprozess:
         1. Holt das Rezept (OPTyp).
         2. Prüft zeitliche Verfügbarkeit im Saal (über berechne_restzeit / op_hinzufuegen).
         3. Prüft und verbraucht/blockiert Personal, Instrumente und Material.
