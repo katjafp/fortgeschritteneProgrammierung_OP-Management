@@ -6,94 +6,73 @@ Hier wird der Klinikalltag simuliert durch das Anlegen von Test-Ressourcen, OP-S
 Prüfung des Zusammenspiels der Module um Fehler schnell zu identifizieren und vermeiden.
 """
 
-import manager
-from ressource import Ressource, Instrument, Einmalartikel
-from op import OPTyp, OP, OPSaal
 from manager import OPManager
+from ressource import Ressource, Instrument, Einmalartikel
+from op import OPTyp
+
 
 def run_tests():
     print("Starte Kliniksimulation & Systemtests")
 
-    # 1. Instanziierung des Haupt-Managers
-    manager = OPManager()
+    # 1. Manager erstellen
+    op_manager = OPManager()
 
-    # 2. Test: OP-Säle registrieren
-    print("\nOP-Säle registrieren")
-    manager.saal_hinzufuegen(saal_id="Zentral-OP_Saal_1", kapazitaet=480) # 8-Stunden-Schicht
-    manager.saal_hinzufuegen(saal_id="Ambulant_Saal_2", kapazitaet=360)   # 6-Stunden-Schicht
+    # 2. OP-Säle registrieren
+    op_manager.saal_hinzufuegen(saal_id="Zentral-OP_Saal_1", kapazitaet=480)
+    op_manager.saal_hinzufuegen(saal_id="Ambulant_Saal_2", kapazitaet=360)
 
-    # 3. Test: Ressourcen-Pool befüllen (Mensch & Material)
-    print("\nRessourcenpool")
-    
-    # Personal & Geräte
+    # 3. Ressourcen anlegen
     arzt_1 = Ressource(name="Dr. Müller (Anästhesie)")
     roentgen = Ressource(name="Mobiles Röntgengerät C-Bogen")
-    manager.ressource_registrieren(arzt_1)
-    manager.ressource_registrieren(roentgen)
-    
-    # Instrumenten-Siebe (mit Steri-Logik)
-    knie_sieb = Instrument(name="Chirurgisches Knie-TEP-Sieb basic")
-    manager.ressource_registrieren(knie_sieb)
-    
-    # Einmalartikel (mit Lager- und Meldebestand)
-    faeden = Einmalartikel(name="Nahtmaterial Vicryl 3-0", bestand=50, meldebestand=10)
-    manager.ressource_registrieren(faeden)
-    
-    print(f"Test-Ressourcen erfolgreich an den Manager übergeben.")
+    op_manager.ressource_registrieren(arzt_1)
+    op_manager.ressource_registrieren(roentgen)
 
-    # 4. Test: Ein OP-Rezept (OPTyp) definieren
-    print("\nOP-Typ definieren")
-    # Eine Knie-OP dauert 90 Minuten und braucht z.B. 3 Fäden
+    knie_sieb = Instrument(name="Chirurgisches Knie-TEP-Sieb basic")
+    op_manager.ressource_registrieren(knie_sieb)
+
+    faeden = Einmalartikel(name="Nahtmaterial Vicryl 3-0", bestand=50, meldebestand=10)
+    op_manager.ressource_registrieren(faeden)
+
+    # 4. OP-Typ definieren
     knie_op_rezept = OPTyp(
-        op_name="Knie-Endoprothese", 
-        standard_dauer=90, 
+        op_name="Knie-Endoprothese",
+        standard_dauer=90,
         benoetigte_ressourcen={"Nahtmaterial Vicryl 3-0": 3}
     )
-    manager.op_typ_definieren(knie_op_rezept)
-    print(f"OP-Rezept für '{knie_op_rezept.op_name}' im System hinterlegt.")
+    op_manager.op_typ_definieren(knie_op_rezept)
 
-    # 5. Test: Einmalartikel-Verbrauch & Warnung triggern
-    print("\nLagerbestands- & Warnungs-Check")
-    print(f"Aktueller Bestand vor Entnahme: {faeden.bestand} Stück")
-    
-    print("Simuliere Entnahme von Fäden...")
-    faeden.konsumiere(5) 
-
-    manager.plane_operation(
-        op_name="Knie-Endoprothese", 
-        saal_id="Zentral-OP_Saal_1", 
+    # 5. Zwei OPs planen (gleicher Typ, unterschiedliche Buchungen)
+    op_manager.plane_operation(
+        op_name="Knie-OP Fall 1",
+        op_typ_name="Knie-Endoprothese",
+        saal_id="Zentral-OP_Saal_1",
         start_minute=0
     )
 
-    # Test: Was passiert mit Restzeit im Saal?
-    saal = manager.saele["Zentral-OP_Saal_1"]
+    op_manager.plane_operation(
+        op_name="Knie-OP Fall 2",
+        op_typ_name="Knie-Endoprothese",
+        saal_id="Zentral-OP_Saal_1",
+        start_minute=110
+    )
+
+    # 6. Restzeit & freie Fenster prüfen
+    saal = op_manager.saele["Zentral-OP_Saal_1"]
     print(f"Verbleibende reine OP-Zeit in {saal.saal_id}: {saal.berechne_restzeit()} Minuten.")
+    print("Freie Zeitfenster:", saal.finde_freie_fenster())
+    print("Nutzbar für 90-Min-OP:", saal.berechne_restzeit(min_dauer=90))
+
+    # 7. Monitoring-Methoden testen
+    op_manager.zeige_verfuegbare_ressourcen(minute=0)
+    op_manager.zeige_ops_von_bis(start=0, ende=300)
+    op_manager.zeige_aktuelle_ops(aktuelle_minute=30)
+
+    # 8. Verschiebung testen (OP wird kürzer)
+    op_manager.verschiebe_op("Zentral-OP_Saal_1", "Knie-OP Fall 1", neue_dauer=60)
+    op_manager.zeige_ops_von_bis(0, 300)
+
     print("Systemtest erfolgreich")
+
 
 if __name__ == "__main__":
     run_tests()
-
-# --- SCHNELLTEST FÜR CLASS RESSOURCE ---
-
-# 1. Wir erstellen die Ressource "Dr. Müller"
-dr_mueller = Ressource("Dr. Müller")
-
-print(f"Test 1: Ist Dr. Müller am Anfang frei?")
-# Wir fragen: Hat er von Minute 0 bis 90 Zeit?
-print(f"Verfügbar (0-90): {dr_mueller.ist_verfuegbar(0, 90)}")  # Erwartet: True
-
-print(f"\nTest 2: Wir buchen eine Knie-OP (Minute 0 bis 90)")
-dr_mueller.blockieren("Knie-OP", 0, 90)
-# Wir schauen uns an, was in seiner Liste gelandet ist
-print(f"Einträge im Kalender: {dr_mueller.geplante_ops}")
-
-print(f"\nTest 3: Erneute Abfragen")
-# Anfrage A: Hat er Zeit für eine OP, die sich überschneidet (z.B. Minute 60 bis 120)?
-print(f"Verfügbar (60-120): {dr_mueller.ist_verfuegbar(60, 120)}")  # Erwartet: False (Konflikt!)
-
-# Anfrage B: Hat er Zeit für eine OP danach (z.B. Minute 120 bis 180)?
-print(f"Verfügbar (120-180): {dr_mueller.ist_verfuegbar(120, 180)}")  # Erwartet: True (Frei!)
-
-print(f"\nTest 4: Wir geben die Knie-OP wieder frei")
-dr_mueller.freigeben("Knie-OP")
-print(f"Einträge im Kalender nach Freigabe: {dr_mueller.geplante_ops}") # Erwartet: [] (wieder leer)
