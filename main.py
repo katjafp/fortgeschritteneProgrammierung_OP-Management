@@ -6,6 +6,7 @@ Hier wird der Klinikalltag simuliert durch das Anlegen von Test-Ressourcen, OP-S
 Prüfung des Zusammenspiels der Module um Fehler schnell zu identifizieren und vermeiden.
 """
 
+import manager
 from ressource import Ressource, Instrument, Einmalartikel
 from op import OPTyp, OP, OPSaal
 from manager import OPManager
@@ -55,11 +56,44 @@ def run_tests():
     print("\nLagerbestands- & Warnungs-Check")
     print(f"Aktueller Bestand vor Entnahme: {faeden.bestand} Stück")
     
-    # Simulation große Materialentnahme um zu sehen ob die Warnung anspringt
-    print("Simuliere Entnahme von 42 Fäden...")
-    faeden.konsumiere(42) # Rest müsste 8 sein -> Meldebestand 10 unterschritten!
+    print("Simuliere Entnahme von Fäden...")
+    faeden.konsumiere(5) 
 
+    manager.plane_operation(
+        op_name="Knie-Endoprothese", 
+        saal_id="Zentral-OP_Saal_1", 
+        start_minute=0
+    )
+
+    # Test: Was passiert mit Restzeit im Saal?
+    saal = manager.saele["Zentral-OP_Saal_1"]
+    print(f"Verbleibende reine OP-Zeit in {saal.saal_id}: {saal.berechne_restzeit()} Minuten.")
     print("Systemtest erfolgreich")
 
 if __name__ == "__main__":
     run_tests()
+
+# --- SCHNELLTEST FÜR CLASS RESSOURCE ---
+
+# 1. Wir erstellen die Ressource "Dr. Müller"
+dr_mueller = Ressource("Dr. Müller")
+
+print(f"Test 1: Ist Dr. Müller am Anfang frei?")
+# Wir fragen: Hat er von Minute 0 bis 90 Zeit?
+print(f"Verfügbar (0-90): {dr_mueller.ist_verfuegbar(0, 90)}")  # Erwartet: True
+
+print(f"\nTest 2: Wir buchen eine Knie-OP (Minute 0 bis 90)")
+dr_mueller.blockieren("Knie-OP", 0, 90)
+# Wir schauen uns an, was in seiner Liste gelandet ist
+print(f"Einträge im Kalender: {dr_mueller.geplante_ops}")
+
+print(f"\nTest 3: Erneute Abfragen")
+# Anfrage A: Hat er Zeit für eine OP, die sich überschneidet (z.B. Minute 60 bis 120)?
+print(f"Verfügbar (60-120): {dr_mueller.ist_verfuegbar(60, 120)}")  # Erwartet: False (Konflikt!)
+
+# Anfrage B: Hat er Zeit für eine OP danach (z.B. Minute 120 bis 180)?
+print(f"Verfügbar (120-180): {dr_mueller.ist_verfuegbar(120, 180)}")  # Erwartet: True (Frei!)
+
+print(f"\nTest 4: Wir geben die Knie-OP wieder frei")
+dr_mueller.freigeben("Knie-OP")
+print(f"Einträge im Kalender nach Freigabe: {dr_mueller.geplante_ops}") # Erwartet: [] (wieder leer)

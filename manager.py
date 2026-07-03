@@ -7,8 +7,11 @@ Gleichzeitig werden Ressourcen-Pools verwaltet.
 Ebenfalls ist eine Zeitverschiebung der Operationen möglich. 
 """
 
+from scipy.constants import minute
+
 from ressource import Ressource, Einmalartikel
 from op import OPSaal, OP, OPTyp
+import ressource
 
 class OPManager:
     """Die oberste Steuereinheit für das gesamte digitale OP- und Ressourcenmanagement."""
@@ -66,7 +69,6 @@ class OPManager:
         
         # definierte benötigte Ressourcen durchgehen 
         for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
-            
             # Fall A: Einmalartikel (Material aus dem Lager)
             if ressourcen_name in self.lager:
                 artikel = self.lager[ressourcen_name]
@@ -90,7 +92,7 @@ class OPManager:
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
                 
                 # Wenn frei, temporär blockieren
-                ressource.blockieren(op_name)
+                ressource.blockieren(op_name, start_minute, start_minute + dauer)
                 temporaer_geblockt.append(ressource)
                 neue_op.geblockte_ressourcen.append(ressource)
             
@@ -102,12 +104,9 @@ class OPManager:
             saal.op_hinzufuegen(neue_op)
             print(f"OP '{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
         except ValueError as e:
-            # Falls  Saal voll ist, Ressourcen wieder freigeben!
             for r in temporaer_geblockt:
-                r.freigeben()
+                r.freigeben(op_name)
             raise e
-
-
         pass
 
     def verschiebe_op(self, saal_id: str, op_name: str, verschiebung_minuten: int) -> None:
@@ -118,3 +117,37 @@ class OPManager:
         """
         # Grundgerüst für den späteren Verschiebungs-Algorithmus
         pass
+
+    def zeige_verfuegbare_ressourcen(self, minute: int) -> None:
+        """Gibt aus, welches Personal/Geräte/Instrumente zu einer bestimmten Minute frei sind."""
+        print(f"\n[STATUS] Verfügbare Ressourcen zur Minute {minute}:")
+
+        for name, ressource in self.ressourcen_pool.items():
+            # Instrumente haben eine eigene Prüfmethode (wegen Sterilisation)
+            if hasattr(ressource, "pruefe_einsatzzeit"):
+                frei = ressource.pruefe_einsatzzeit(minute)
+            else:
+                # Für "normale" Ressourcen (Arzt, Gerät) reicht ein 1-Minuten-Fenster
+                frei = ressource.ist_verfuegbar(minute, minute + 1)
+
+            status = "frei" if frei else "belegt"
+            print(f"  - {name}: {status}")
+    
+    def zeige_ops_von_bis(self, start: int, ende: int) -> None:
+        """Zeigt alle geplanten OPs, die (teilweise) im Zeitfenster [start, ende] liegen."""
+        print(f"\n[STATUS] OPs zwischen Minute {start} und {ende}:")
+        gefunden = False
+
+        for saal in self.saele.values():
+            for op in saal.geplante_ops:
+                # Überschneidung: OP beginnt vor Fensterende UND endet nach Fensterbeginn
+                if op.start_minute < ende and op.end_minute > start:
+                    print(f"  - {op.op_name} in {saal.saal_id}: {op.start_minute}-{op.end_minute}")
+                    gefunden = True
+
+        if not gefunden:
+            print("  Keine OPs in diesem Zeitraum.")
+    
+    def zeige_aktuelle_ops(self, aktuelle_minute: int) -> None:
+        """Zeigt alle OPs, die genau zur angegebenen Minute laufen."""
+        self.zeige_ops_von_bis(aktuelle_minute, aktuelle_minute + 1)
