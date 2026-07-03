@@ -34,30 +34,44 @@ class OPSaal:
         self.geplante_ops: list[OP] = []
         self.reinigung: int = reinigung  # Reinigungszeit nach jeder OP
 
-    
+    def finde_freie_fenster(self) -> list[dict]:
+        """Ermittelt alle zusammenhängenden freien Zeitfenster im Saal 
+        (unter Berücksichtigung der Reinigungszeit nach jeder OP)."""
+        fenster = []
+        cursor = 0  # Zeiger: ab wann könnte die nächste Lücke beginnen?
 
-    def berechne_restzeit(self) -> int:
+        for op in self.geplante_ops:  # ist bereits nach start_minute sortiert
+            if op.start_minute > cursor:
+                fenster.append({
+                    "von": cursor,
+                    "bis": op.start_minute,
+                    "dauer": op.start_minute - cursor
+                })
+            cursor = op.end_minute + self.reinigung
+
+        # Letztes Fenster: vom Ende der letzten OP (+Reinigung) bis Saalschluss
+        if cursor < self.kapazitaet_minute:
+            fenster.append({
+                "von": cursor,
+                "bis": self.kapazitaet_minute,
+                "dauer": self.kapazitaet_minute - cursor
+            })
+
+        return fenster
+
+
+    def berechne_restzeit(self, min_dauer: int = 0) -> int:
         """
-        Analysiert den Zeitstrahl und findet alle Zeitfenster, in dennen 
-        neue Operationen geplant werden könnten, unter Berücksichtigung der Reinigungszeit.
+        Berechnet die verbleibenden freien Minuten im Saal.
+        Mit min_dauer kannst du nur Fenster zählen lassen, die groß genug für 
+        eine OP dieser Mindestdauer sind – so werden zu kleine, unbrauchbare 
+        Lücken (z.B. 10 Minuten zwischen zwei OPs) korrekt ausgeschlossen.
         """
-
-        if not self.geplante_ops:
-            return self.kapazitaet_minute
-
-        belegte_zeit = sum(
-            (op.end_minute - op.start_minute) + self.reinigung
-            for op in self.geplante_ops)
-        return max(0, self.kapazitaet_minute - belegte_zeit)
-
-        """Berechnet die Summe aller echt nutzbaren Op-Minuten in den Lücken."""
-        fenster = self.finde_freie_zeitfenster()
-        return sum(f["nutzbare_op_zeit"] for f in fenster)
+        fenster = self.finde_freie_fenster()
+        return sum(f["dauer"] for f in fenster if f["dauer"] >= min_dauer)
 
     def op_hinzufuegen(self, neue_op: OP) -> None:
-        """Prüft, ob eine neue OP zeitlich exakt in eine der freien Lücken passt."""
-        neue_op_dauer_mit_reinigung = (neue_op.end_minute - neue_op.start_minute) + self.reinigung
-        
+        """Prüft, ob eine neue OP zeitlich exakt in eine der freien Lücken passt."""        
         # überprüft, ob OP in Zeit bis Saal-Ende passt
         if neue_op.end_minute + self.reinigung > self.kapazitaet_minute:
             raise ValueError(f"Fehler: OP überschreitet die Schließzeit von {self.saal_id}!")
