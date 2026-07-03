@@ -7,11 +7,8 @@ Gleichzeitig werden Ressourcen-Pools verwaltet.
 Ebenfalls ist eine Zeitverschiebung der Operationen möglich. 
 """
 
-from scipy.constants import minute
-
 from ressource import Ressource, Einmalartikel
 from op import OPSaal, OP, OPTyp
-import ressource
 
 class OPManager:
     """Die oberste Steuereinheit für das gesamte digitale OP- und Ressourcenmanagement."""
@@ -37,86 +34,110 @@ class OPManager:
         """Hinterlegt ein neues OP-Rezept (z.B. Knie-TEP) im System."""
         self.op_typen[op_typ.op_name] = op_typ
 
-    def plane_operation(self, op_name: str, saal_id: str, start_minute: int) -> None:
+    def plane_operation(self, op_name: str, op_typ_name: str, saal_id: str, start_minute: int) -> None:
         """
-        Prüft die Verfügbarkeit von Saal und Ressourcen und bucht die OP in den Zeitstrahl ein, wenn
-        alle Ressouircen verfügbar sind.
-        
-        Kernprozess:
-        1. Holt das Rezept (OPTyp).
-        2. Prüft zeitliche Verfügbarkeit im Saal (über berechne_restzeit / op_hinzufuegen).
-        3. Prüft und verbraucht/blockiert Personal, Instrumente und Material.
-        4. Trägt die OP final im Saal ein.
-        """
-        print(f"\n[BUCHUNG] Starte Planung für OP '{op_name}' in {saal_id} ab Minute {start_minute}")
+        Prüft die Verfügbarkeit von Saal und Ressourcen und bucht die OP in den Zeitstrahl ein.
 
-        # OP Rezept holen (OPTyp)
-        if op_name not in self.op_typen:
-            raise ValueError(f"Fehler: Der OP-Typ '{op_name}' ist nicht im System definiert!")
-        rezept = self.op_typen[op_name]
+        op_name: eindeutiger Bezeichner DIESER konkreten Buchung (z.B. "Knie-OP Patient Müller")
+        op_typ_name: Name des Rezepts im Katalog (z.B. "Knie-Endoprothese")
+        """
+        print(f"\n[BUCHUNG] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
+
+        # OP-Rezept anhand des TYP-Namens holen
+        if op_typ_name not in self.op_typen:
+            raise ValueError(f"Fehler: Der OP-Typ '{op_typ_name}' ist nicht im System definiert!")
+        rezept = self.op_typen[op_typ_name]
         dauer = rezept.standard_dauer
 
-        # prüfen ob Saal existiert
         if saal_id not in self.saele:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
 
-        # Neue OP-Instanz anlegen
+        # Neue OP-Instanz anlegen — sie bekommt den eindeutigen Buchungs-Namen
         neue_op = OP(op_name, saal_id, start_minute, dauer)
 
-        # Ressourcen-Verfügbarkeit prüfen & blockieren
         temporaer_geblockt = []
-        
-        # definierte benötigte Ressourcen durchgehen 
+
         for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
-            # Fall A: Einmalartikel (Material aus dem Lager)
             if ressourcen_name in self.lager:
                 artikel = self.lager[ressourcen_name]
-                # Material abziehen (wirft automatisch einen Fehler, falls Lager leer)
                 artikel.konsumiere(benoetigte_menge)
-            
-            # Fall B: Ressource (Arzt, Gerät, Instrumenten-Sieb)
+
             elif ressourcen_name in self.ressourcen_pool:
                 ressource = self.ressourcen_pool[ressourcen_name]
-                
-                # Prüfen, ob Ressource zu dieser Minute frei ist
+
                 if hasattr(ressource, "pruefe_einsatzzeit"):
                     ist_frei = ressource.pruefe_einsatzzeit(start_minute)
                 else:
                     ist_frei = ressource.ist_verfuegbar(start_minute, start_minute + dauer)
 
                 if not ist_frei:
-                    # falls etwas belegt ist
                     for r in temporaer_geblockt:
-                        r.freigeben()
+                        r.freigeben(op_name)
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
-                
-                # Wenn frei, temporär blockieren
+
                 ressource.blockieren(op_name, start_minute, start_minute + dauer)
                 temporaer_geblockt.append(ressource)
                 neue_op.geblockte_ressourcen.append(ressource)
-            
+
             else:
                 raise ValueError(f"Fehler: Die geforderte Ressource '{ressourcen_name}' existiert nicht!")
 
-        # Zeitfenster im Saal prüfen und OP final eintragen
         try:
             saal.op_hinzufuegen(neue_op)
-            print(f"OP '{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
+            print(f"'{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
         except ValueError as e:
             for r in temporaer_geblockt:
                 r.freigeben(op_name)
             raise e
-        pass
 
-    def verschiebe_op(self, saal_id: str, op_name: str, verschiebung_minuten: int) -> None:
+    def verschiebe_op(self, saal_id: str, op_name: str, neue_dauer: int) -> None:
         """
-        dynamische Zeitverschiebung:
-        Verschiebt eine OP bei Verspätungen und passt alle nachfolgenden OPs 
-        im selben Saal automatisch an.
+        Passt die Dauer einer OP an (aktuell: nur Verkürzung) und rückt alle 
+        nachfolgenden OPs im selben Saal automatisch um die gewonnene Zeit vor.
         """
-        # Grundgerüst für den späteren Verschiebungs-Algorithmus
-        pass
+        if saal_id not in self.saele:
+            raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
+        saal = self.saele[saal_id]
+
+        # 1. Die betroffene OP finden
+        op = next((o for o in saal.geplante_ops if o.op_name == op_name), None)
+        if op is None:
+            raise ValueError(f"Fehler: OP '{op_name}' ist in '{saal_id}' nicht geplant!")
+
+        alte_end_minute = op.end_minute
+        neue_end_minute = op.start_minute + neue_dauer
+        verschiebung = neue_end_minute - alte_end_minute  # negativ = Zeitgewinn
+
+        if verschiebung >= 0:
+            raise NotImplementedError("Verlängerung wird im nächsten Schritt ergänzt.")
+
+        print(f"\n[ANPASSUNG] '{op_name}' wird um {abs(verschiebung)} Min. kürzer (neues Ende: {neue_end_minute}).")
+
+        # 2. Die OP selbst aktualisieren
+        op.end_minute = neue_end_minute
+        self._aktualisiere_ressourcen_zeitfenster(op)
+
+        # 3. Alle nachfolgenden OPs im Saal nach vorne rücken
+        for folge_op in saal.geplante_ops:
+            if folge_op.start_minute >= alte_end_minute:
+                folge_op.start_minute += verschiebung
+                folge_op.end_minute += verschiebung
+                self._aktualisiere_ressourcen_zeitfenster(folge_op)
+                print(f"  -> '{folge_op.op_name}' verschoben auf {folge_op.start_minute}-{folge_op.end_minute}")
+
+        saal.geplante_ops.sort(key=lambda o: o.start_minute)
+        print(f"Neue Restzeit in {saal_id}: {saal.berechne_restzeit()} Minuten.")
+
+
+    def _aktualisiere_ressourcen_zeitfenster(self, op: OP) -> None:
+        """Hilfsmethode: Aktualisiert für eine OP den Kalender-Eintrag jeder geblockten 
+        Ressource auf die (neue) Start-/Endzeit der OP."""
+        for ressource in op.geblockte_ressourcen:
+            ressource.freigeben(op.op_name)
+            ressource.blockieren(op.op_name, op.start_minute, op.end_minute)
+            if hasattr(ressource, "starte_sterilisation"):
+                ressource.starte_sterilisation(op.end_minute)
 
     def zeige_verfuegbare_ressourcen(self, minute: int) -> None:
         """Gibt aus, welches Personal/Geräte/Instrumente zu einer bestimmten Minute frei sind."""
