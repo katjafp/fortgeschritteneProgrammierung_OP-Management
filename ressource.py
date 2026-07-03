@@ -8,6 +8,9 @@ chirurgischen Instrumenten (mit Sterilisationsprozess) und Einmalartikeln
 (mit Lager- und Meldebestand) abzubilden.
 """
 
+from unicodedata import name
+
+
 class Ressource:
     """Basisklasse für alle Entitäten (Personal, Geräte), die für eine OP blockiert werden."""
     def __init__(self, name: str):
@@ -42,6 +45,7 @@ class Instrument(Ressource):
     def __init__(self, name: str):
         super().__init__(name)
         self.steri_bis_minute: int = 0
+        self.verfuegbar: bool = True 
 
     def starte_sterilisation(self, end_minute_op: int) -> None:
         """Setzt den Status auf nicht verfügbar, bis der Steri-Prozess beendet ist."""
