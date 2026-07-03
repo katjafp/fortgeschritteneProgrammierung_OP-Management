@@ -8,9 +8,6 @@ chirurgischen Instrumenten (mit Sterilisationsprozess) und Einmalartikeln
 (mit Lager- und Meldebestand) abzubilden.
 """
 
-from unicodedata import name
-
-
 class Ressource:
     """Basisklasse für alle Entitäten (Personal, Geräte), die für eine OP blockiert werden."""
     def __init__(self, name: str):
@@ -44,20 +41,15 @@ class Instrument(Ressource):
     """Erbt von Ressource und fügt die Logik des Sterilisationsprozesses hinzu."""
     def __init__(self, name: str):
         super().__init__(name)
-        self.steri_bis_minute: int = 0
-        self.verfuegbar: bool = True 
+        self.steri_bis_minute: int = 0  # ab Systemstart sofort einsatzbereit
 
     def starte_sterilisation(self, end_minute_op: int) -> None:
-        """Setzt den Status auf nicht verfügbar, bis der Steri-Prozess beendet ist."""
-        self.verfuegbar = False
-        # Einheitliche Sterilisationszeit: 60 Minuten
+        """Setzt den Zeitpunkt, ab dem das Sieb nach der OP wieder steril ist (60 Min. Standarddauer)."""
         self.steri_bis_minute = end_minute_op + 60
 
     def pruefe_einsatzzeit(self, ziel_minute: int) -> bool:
-        """Prüft, ob das chirurgische Sieb zum Zielzeitpunkt wieder steril und einsatzbereit ist."""
-        if ziel_minute < self.steri_bis_minute:
-            return False
-        return self.verfuegbar
+        """Prüft, ob das chirurgische Sieb zum Zielzeitpunkt wieder steril ist."""
+        return ziel_minute >= self.steri_bis_minute
 
 
 class Einmalartikel(Ressource):
@@ -76,4 +68,4 @@ class Einmalartikel(Ressource):
         
         # Automatischer Nachbestell-Trigger
         if self.bestand <= self.meldebestand:
-            print(f"[WARNUNG] Meldebestand für '{self.name}' unterschritten! Aktueller Bestand: {self.bestand}")
+            print(f"Warnung! Meldebestand für '{self.name}' unterschritten! Aktueller Bestand: {self.bestand}")

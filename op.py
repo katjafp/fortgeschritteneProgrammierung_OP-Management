@@ -36,33 +36,22 @@ class OPSaal:
 
     
 
-    def berechne_restzeit(self) -> list[dict[str, int]]:
+    def berechne_restzeit(self) -> int:
         """
         Analysiert den Zeitstrahl und findet alle Zeitfenster, in dennen 
         neue Operationen geplant werden könnten, unter Berücksichtigung der Reinigungszeit.
         """
 
         if not self.geplante_ops:
-            # Wenn der Saal komplett leer ist, können wir die vollen 480 Minuten nutzen
             return self.kapazitaet_minute
 
-        belegte_zeit = 0
-        for op in self.geplante_ops:
-            op_dauer = op.end_minute - op.start_minute
-            # Jede OP blockiert den Saal für ihre Dauer + die Reinigung danach
-            belegte_zeit += (op_dauer + self.reinigung)
+        belegte_zeit = sum(
+            (op.end_minute - op.start_minute) + self.reinigung
+            for op in self.geplante_ops)
+        return max(0, self.kapazitaet_minute - belegte_zeit)
 
-        # Die verbleibende reine OP-Zeit ist die Gesamtkapazität minus die belegte Zeit
-        restzeit = self.kapazitaet_minute - belegte_zeit
-        
-        # Da wir nach der allerletzten OP des Tages keine neue OP mehr planen, 
-        # steht uns die Reinigungszeit dieser letzten OP eigentlich wieder als Puffer zur Verfügung.
-        # Aber um sicherzugehen, dass wir nicht überziehen, ist 'restzeit' der sicherste Wert.
-        return max(0, restzeit)
-
-        """Berechnet die Summe aller echt NUTZBAREN Operations-Minuten in den Lücken."""
+        """Berechnet die Summe aller echt nutzbaren Op-Minuten in den Lücken."""
         fenster = self.finde_freie_zeitfenster()
-        # Wir summieren nur die Zeit auf, die man wirklich mit Operieren verbringen kann
         return sum(f["nutzbare_op_zeit"] for f in fenster)
 
     def op_hinzufuegen(self, neue_op: OP) -> None:
