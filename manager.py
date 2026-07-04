@@ -93,42 +93,85 @@ class OPManager:
 
     def verschiebe_op(self, saal_id: str, op_name: str, neue_dauer: int) -> None:
         """
-        Passt die Dauer einer OP an (aktuell: nur Verkürzung) und rückt alle 
-        nachfolgenden OPs im selben Saal automatisch um die gewonnene Zeit vor.
+        Passt die Dauer einer OP an (kürzer ODER länger) und verschiebt alle 
+        nachfolgenden OPs im selben Saal automatisch mit. 
+        
+        Vorgehen: Erst wird geprüft, ob die Änderung überhaupt möglich ist 
+        (Saalschluss, Ressourcen-Kollisionen). Erst wenn alles passt, wird 
+        die Änderung wirklich übernommen. Geht etwas nicht, bleibt der 
+        ursprüngliche Zustand komplett erhalten (Exception statt Teil-Änderung).
         """
         if saal_id not in self.saele:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
 
-        # 1. Die betroffene OP finden
         op = next((o for o in saal.geplante_ops if o.op_name == op_name), None)
         if op is None:
             raise ValueError(f"Fehler: OP '{op_name}' ist in '{saal_id}' nicht geplant!")
 
         alte_end_minute = op.end_minute
         neue_end_minute = op.start_minute + neue_dauer
-        verschiebung = neue_end_minute - alte_end_minute  # negativ = Zeitgewinn
+        verschiebung = neue_end_minute - alte_end_minute
 
-        if verschiebung >= 0:
-            raise NotImplementedError("Verlängerung wird im nächsten Schritt ergänzt.")
+        if verschiebung == 0:
+            print(f"[HINWEIS] '{op_name}' bleibt unverändert bei {neue_dauer} Minuten.")
+            return
 
-        print(f"\n[ANPASSUNG] '{op_name}' wird um {abs(verschiebung)} Min. kürzer (neues Ende: {neue_end_minute}).")
+        # Alle nachfolgenden OPs im selben Saal werden um denselben Betrag mitverschoben
+        folge_ops = [o for o in saal.geplante_ops if o.start_minute >= alte_end_minute]
 
-        # 2. Die OP selbst aktualisieren
-        op.end_minute = neue_end_minute
-        self._aktualisiere_ressourcen_zeitfenster(op)
+        # Neue Zeiten für alle betroffenen OPs im Voraus berechnen
+        neue_zeiten = [(op, op.start_minute, neue_end_minute)]
+        for folge_op in folge_ops:
+            neue_zeiten.append((folge_op, folge_op.start_minute + verschiebung, folge_op.end_minute + verschiebung))
 
-        # 3. Alle nachfolgenden OPs im Saal nach vorne rücken
-        for folge_op in saal.geplante_ops:
-            if folge_op.start_minute >= alte_end_minute:
-                folge_op.start_minute += verschiebung
-                folge_op.end_minute += verschiebung
-                self._aktualisiere_ressourcen_zeitfenster(folge_op)
-                print(f"  -> '{folge_op.op_name}' verschoben auf {folge_op.start_minute}-{folge_op.end_minute}")
+        # Prüfung 1: Überschreitet die letzte betroffene OP die Schließzeit des Saals?
+        letzte_neue_end_minute = neue_zeiten[-1][2]
+        if letzte_neue_end_minute + saal.reinigung > saal.kapazitaet_minute:
+            raise ValueError(f"Verschiebung nicht möglich: {saal_id} würde über die Schließzeit hinaus belegt!")
 
-        saal.geplante_ops.sort(key=lambda o: o.start_minute)
+        # Prüfung 2: Sind alle Ressourcen zu den NEUEN Zeiten noch verfügbar?
+        # Dazu geben wir die betroffenen Ressourcen testweise frei und prüfen dann.
+        for o, _, _ in neue_zeiten:
+            for ressource in o.geblockte_ressourcen:
+                ressource.freigeben(o.op_name)
+
+        konflikt = None
+        for o, neuer_start, neuer_ende in neue_zeiten:
+            for ressource in o.geblockte_ressourcen:
+                if hasattr(ressource, "pruefe_einsatzzeit"):
+                    frei = ressource.pruefe_einsatzzeit(neuer_start)
+                else:
+                    frei = ressource.ist_verfuegbar(neuer_start, neuer_ende)
+                if not frei:
+                    konflikt = f"Verschiebung nicht möglich: Ressource für '{o.op_name}' ist zur neuen Zeit ({neuer_start}-{neuer_ende}) belegt!"
+                    break
+            if konflikt:
+                break
+
+        if konflikt:
+            # Nichts geht mehr: alte Zeiten der Ressourcen wiederherstellen und abbrechen
+            for o, _, _ in neue_zeiten:
+                for ressource in o.geblockte_ressourcen:
+                    ressource.blockieren(o.op_name, o.start_minute, o.end_minute)
+            raise ValueError(konflikt)
+
+        # Alles passt: Änderung endgültig übernehmen
+        richtung = "kürzer" if verschiebung < 0 else "länger"
+        print(f"\n[ANPASSUNG] '{op_name}' wird um {abs(verschiebung)} Min. {richtung} (neues Ende: {neue_end_minute}).")
+
+        for o, neuer_start, neuer_ende in neue_zeiten:
+            o.start_minute = neuer_start
+            o.end_minute = neuer_ende
+            for ressource in o.geblockte_ressourcen:
+                ressource.blockieren(o.op_name, neuer_start, neuer_ende)
+                if hasattr(ressource, "starte_sterilisation"):
+                    ressource.starte_sterilisation(neuer_ende)
+            if o is not op:
+                print(f"  -> '{o.op_name}' verschoben auf {neuer_start}-{neuer_ende}")
+
+        saal.geplante_ops.sort(key=lambda x: x.start_minute)
         print(f"Neue Restzeit in {saal_id}: {saal.berechne_restzeit()} Minuten.")
-
 
     def _aktualisiere_ressourcen_zeitfenster(self, op: OP) -> None:
         """Hilfsmethode: Aktualisiert für eine OP den Kalender-Eintrag jeder geblockten 

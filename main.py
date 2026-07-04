@@ -68,8 +68,19 @@ def run_tests():
     op_manager.zeige_aktuelle_ops(aktuelle_minute=30)
 
     # 8. Verschiebung testen (OP wird kürzer)
+    # OP wird kürzer (funktioniert)
     op_manager.verschiebe_op("Zentral-OP_Saal_1", "Knie-OP Fall 1", neue_dauer=60)
     op_manager.zeige_ops_von_bis(0, 300)
+
+    # OP wird länger, aber noch im Rahmen (funktioniert)
+    op_manager.verschiebe_op("Zentral-OP_Saal_1", "Knie-OP Fall 1", neue_dauer=100)
+    op_manager.zeige_ops_von_bis(0, 300)
+
+    # OP wird SO lang, dass sie mit Fall 2 kollidiert (muss fehlschlagen!)
+    try:
+        op_manager.verschiebe_op("Zentral-OP_Saal_1", "Knie-OP Fall 1", neue_dauer=500)
+    except ValueError as e:
+        print(f"[ERWARTETER FEHLER] {e}")
 
     print("Systemtest erfolgreich")
 
