@@ -81,6 +81,11 @@ def run_tests():
         op_manager.verschiebe_op("Zentral-OP_Saal_1", "Knie-OP Fall 1", neue_dauer=500)
     except ValueError as e:
         print(f"[ERWARTETER FEHLER] {e}")
+    
+
+    # 9. Lagerauffüllung testen
+    print(f"\nBestand vor Nachlieferung: {faeden.bestand}")
+    op_manager.lager_material_ein(name="Nahtmaterial Vicryl 3-0", menge=20)
 
     print("Systemtest erfolgreich")
 

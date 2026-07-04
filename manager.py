@@ -29,6 +29,14 @@ class OPManager:
             self.lager[ressource.name] = ressource
         else:
             self.ressourcen_pool[ressource.name] = ressource
+    def lager_material_ein(self, name: str, menge: int) -> None:
+        """Erhöht den Bestand eines Einmalartikels im Lager, z.B. bei Anlieferung."""
+        if name not in self.lager:
+            raise ValueError(f"Fehler: Der Artikel '{name}' ist nicht im Lager registriert!")
+        
+        artikel = self.lager[name]
+        artikel.bestand += menge
+        print(f"[LAGER] {menge} Stück '{name}' eingelagert. Neuer Bestand: {artikel.bestand}")
 
     def op_typ_definieren(self, op_typ: OPTyp) -> None:
         """Hinterlegt ein neues OP-Rezept (z.B. Knie-TEP) im System."""
