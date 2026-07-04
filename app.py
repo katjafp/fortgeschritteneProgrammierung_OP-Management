@@ -54,3 +54,29 @@ for saal_id, saal in manager.saele.items():
                 st.write(f"- {op.op_name}: Minute {op.start_minute}–{op.end_minute}")
         else:
             st.write("_Noch keine OPs geplant._")
+
+st.header("Neue OP buchen")
+
+with st.form("op_buchen_formular"):
+    op_name = st.text_input("Bezeichnung dieser Buchung (z.B. Patientenname/Fall)")
+    op_typ_name = st.selectbox("OP-Typ", options=list(manager.op_typen.keys()))
+    saal_id = st.selectbox("Saal", options=list(manager.saele.keys()))
+    start_minute = st.number_input("Startminute (0 = Schichtbeginn)", min_value=0, step=10)
+
+    abschicken = st.form_submit_button("OP einplanen")
+
+    if abschicken:
+        if not op_name:
+            st.error("Bitte eine Bezeichnung für die Buchung eingeben.")
+        else:
+            try:
+                manager.plane_operation(
+                    op_name=op_name,
+                    op_typ_name=op_typ_name,
+                    saal_id=saal_id,
+                    start_minute=int(start_minute)
+                )
+                st.success(f"'{op_name}' erfolgreich in {saal_id} eingeplant!")
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
