@@ -38,18 +38,16 @@ class Ressource:
 
 
 class Instrument(Ressource):
-    """Erbt von Ressource und fügt die Logik des Sterilisationsprozesses hinzu."""
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.steri_bis_minute: int = 0  # ab Systemstart sofort einsatzbereit
+    """Erbt von Ressource. Nach jeder OP braucht das Sieb zusätzlich eine 
+    Sterilisationszeit, bevor es für die nächste OP wieder einsatzbereit ist."""
+    
+    sterilisationsdauer: int = 60  # Minuten Sterilisation nach jeder Nutzung
 
-    def starte_sterilisation(self, end_minute_op: int) -> None:
-        """Setzt den Zeitpunkt, ab dem das Sieb nach der OP wieder steril ist (60 Min. Standarddauer)."""
-        self.steri_bis_minute = end_minute_op + 60
-
-    def pruefe_einsatzzeit(self, ziel_minute: int) -> bool:
-        """Prüft, ob das chirurgische Sieb zum Zielzeitpunkt wieder steril ist."""
-        return ziel_minute >= self.steri_bis_minute
+    def blockieren(self, op_name: str, von_minute: int, bis_minute: int) -> None:
+        """Reserviert das Sieb für eine OP - inkl. der anschließenden 
+        Sterilisationszeit. Dadurch zeigt ist_verfuegbar() automatisch erst 
+        NACH der Sterilisation wieder 'frei' an."""
+        super().blockieren(op_name, von_minute, bis_minute + self.sterilisationsdauer)
 
 
 class Einmalartikel(Ressource):

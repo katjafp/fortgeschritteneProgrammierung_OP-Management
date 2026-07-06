@@ -74,10 +74,7 @@ class OPManager:
             elif ressourcen_name in self.ressourcen_pool:
                 ressource = self.ressourcen_pool[ressourcen_name]
 
-                if hasattr(ressource, "pruefe_einsatzzeit"):
-                    ist_frei = ressource.pruefe_einsatzzeit(start_minute)
-                else:
-                    ist_frei = ressource.ist_verfuegbar(start_minute, start_minute + dauer)
+                ist_frei = ressource.ist_verfuegbar(start_minute, start_minute + dauer)
 
                 if not ist_frei:
                     for r in temporaer_geblockt:
@@ -85,8 +82,7 @@ class OPManager:
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
 
                 ressource.blockieren(op_name, start_minute, start_minute + dauer)
-                if hasattr(ressource, "starte_sterilisation"):
-                    ressource.starte_sterilisation(start_minute + dauer)
+        
                 temporaer_geblockt.append(ressource)
                 neue_op.geblockte_ressourcen.append(ressource)
 
@@ -152,10 +148,7 @@ class OPManager:
         konflikt = None
         for o, neuer_start, neuer_ende in neue_zeiten:
             for ressource in o.geblockte_ressourcen:
-                if hasattr(ressource, "pruefe_einsatzzeit"):
-                    frei = ressource.pruefe_einsatzzeit(neuer_start)
-                else:
-                    frei = ressource.ist_verfuegbar(neuer_start, neuer_ende)
+                frei = ressource.ist_verfuegbar(neuer_start, neuer_ende)
                 if not frei:
                     konflikt = f"Verschiebung nicht möglich: Ressource für '{o.op_name}' ist zur neuen Zeit ({neuer_start}-{neuer_ende}) belegt!"
                     break
@@ -178,8 +171,6 @@ class OPManager:
             o.end_minute = neuer_ende
             for ressource in o.geblockte_ressourcen:
                 ressource.blockieren(o.op_name, neuer_start, neuer_ende)
-                if hasattr(ressource, "starte_sterilisation"):
-                    ressource.starte_sterilisation(neuer_ende)
             if o is not op:
                 print(f"  -> '{o.op_name}' verschoben auf {neuer_start}-{neuer_ende}")
 
@@ -191,13 +182,8 @@ class OPManager:
         print(f"\n[STATUS] Verfügbare Ressourcen zur Minute {minute}:")
 
         for name, ressource in self.ressourcen_pool.items():
-            # Instrumente haben eine eigene Prüfmethode (wegen Sterilisation)
-            if hasattr(ressource, "pruefe_einsatzzeit"):
-                frei = ressource.pruefe_einsatzzeit(minute)
-            else:
-                # Für "normale" Ressourcen (Arzt, Gerät) reicht ein 1-Minuten-Fenster
-                frei = ressource.ist_verfuegbar(minute, minute + 1)
-
+            # 1-Minuten-Fenster reicht, um zu prüfen, ob die Ressource gerade frei ist
+            frei = ressource.ist_verfuegbar(minute, minute + 1)
             status = "frei" if frei else "belegt"
             print(f"  - {name}: {status}")
     
