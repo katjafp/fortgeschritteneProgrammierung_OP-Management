@@ -109,6 +109,9 @@ class OPManager:
         die Änderung wirklich übernommen. Geht etwas nicht, bleibt der 
         ursprüngliche Zustand komplett erhalten (Exception statt Teil-Änderung).
         """
+        if neue_dauer <= 0:
+            raise ValueError(f"Fehler: Neue Dauer muss positiv sein (erhalten: {neue_dauer}).")
+
         if saal_id not in self.saele:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
@@ -180,15 +183,6 @@ class OPManager:
 
         saal.geplante_ops.sort(key=lambda x: x.start_minute)
         print(f"Neue Restzeit in {saal_id}: {saal.berechne_restzeit()} Minuten.")
-
-    def _aktualisiere_ressourcen_zeitfenster(self, op: OP) -> None:
-        """Hilfsmethode: Aktualisiert für eine OP den Kalender-Eintrag jeder geblockten 
-        Ressource auf die (neue) Start-/Endzeit der OP."""
-        for ressource in op.geblockte_ressourcen:
-            ressource.freigeben(op.op_name)
-            ressource.blockieren(op.op_name, op.start_minute, op.end_minute)
-            if hasattr(ressource, "starte_sterilisation"):
-                ressource.starte_sterilisation(op.end_minute)
 
     def zeige_verfuegbare_ressourcen(self, minute: int) -> None:
         """Gibt aus, welches Personal/Geräte/Instrumente zu einer bestimmten Minute frei sind."""
