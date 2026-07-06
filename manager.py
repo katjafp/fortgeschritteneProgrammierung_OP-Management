@@ -85,6 +85,8 @@ class OPManager:
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
 
                 ressource.blockieren(op_name, start_minute, start_minute + dauer)
+                if hasattr(ressource, "starte_sterilisation"):
+                    ressource.starte_sterilisation(start_minute + dauer)
                 temporaer_geblockt.append(ressource)
                 neue_op.geblockte_ressourcen.append(ressource)
 
