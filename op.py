@@ -8,6 +8,15 @@ Operationen (OP) sowie die OP-Säle (OPSaal), inklusive Berechnung von
 freien, zusammenhängenden Zeitfenstern unter Berücksichtigung 
 der Reinigungszeiten.
 """
+def minute_zu_uhrzeit(minute: int, schichtbeginn: str = "08:00") -> str:
+    """Wandelt eine Minute relativ zum Schichtbeginn in eine lesbare Uhrzeit um 
+    (z.B. minute=90 bei Schichtbeginn 08:00 -> '09:30')."""
+    start_stunde, start_minute_offset = map(int, schichtbeginn.split(":"))
+    gesamt_minuten = start_stunde * 60 + start_minute_offset + minute
+    stunde = (gesamt_minuten // 60) % 24
+    rest_minute = gesamt_minuten % 60
+    return f"{stunde:02d}:{rest_minute:02d}"
+
 class OPTyp:
     """Definiert eine OP-Art mit ihrer Standard-Dauer und den benötigten Ressourcen."""
     def __init__(self, op_name: str, standard_dauer: int, benoetigte_ressourcen: dict[str, int]):
@@ -58,7 +67,6 @@ class OPSaal:
             })
 
         return fenster
-
 
     def berechne_restzeit(self, min_dauer: int = 0) -> int:
         """
