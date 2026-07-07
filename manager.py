@@ -1,7 +1,7 @@
 """
 Modul: manager (manager.py)
 
-Hier ist die zentrale Steuerungseinheit für das gesamte digitale OP- und Ressourcenmanagement.
+Hier ist die Steuerungseinheit für das gesamte digitale OP- & Ressourcenmanagement.
 OPManager verknüpft die Ressourcen (ressource.py) mit der Raum- & Zeitplanung (op.py).
 Gleichzeitig werden Ressourcen-Pools verwaltet. 
 Ebenfalls ist eine Zeitverschiebung der Operationen möglich. 
@@ -29,14 +29,18 @@ class OPManager:
             self.lager[ressource.name] = ressource
         else:
             self.ressourcen_pool[ressource.name] = ressource
+
     def lager_material_ein(self, name: str, menge: int) -> None:
         """Erhöht den Bestand eines Einmalartikels im Lager, z.B. bei Anlieferung."""
+        if menge <= 0:
+            raise ValueError(f"Fehler: Nachlieferungsmenge muss positiv sein (erhalten: {menge}).")
+
         if name not in self.lager:
             raise ValueError(f"Fehler: Der Artikel '{name}' ist nicht im Lager registriert!")
         
         artikel = self.lager[name]
         artikel.bestand += menge
-        print(f"[LAGER] {menge} Stück '{name}' eingelagert. Neuer Bestand: {artikel.bestand}")
+        print(f"[Lager] {menge} Stück '{name}' eingelagert. Neuer Bestand: {artikel.bestand}")
 
     def op_typ_definieren(self, op_typ: OPTyp) -> None:
         """Hinterlegt ein neues OP-Rezept (z.B. Knie-TEP) im System."""
@@ -46,10 +50,13 @@ class OPManager:
         """
         Prüft die Verfügbarkeit von Saal und Ressourcen und bucht die OP in den Zeitstrahl ein.
 
-        op_name: eindeutiger Bezeichner DIESER konkreten Buchung (z.B. "Knie-OP Patient Müller")
+        op_name: eindeutiger Bezeichner der konkreten Buchung (z.B. "Knie-OP Patient Müller")
         op_typ_name: Name des Rezepts im Katalog (z.B. "Knie-Endoprothese")
         """
-        print(f"\n[BUCHUNG] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
+        print(f"\n[Buchung] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
+
+        if start_minute < 0:
+            raise ValueError(f"Fehler: Startminute muss 0 oder positiv sein (erhalten: {start_minute}).")
 
         # OP-Rezept anhand des TYP-Namens holen
         if op_typ_name not in self.op_typen:
@@ -99,13 +106,13 @@ class OPManager:
 
     def verschiebe_op(self, saal_id: str, op_name: str, neue_dauer: int) -> None:
         """
-        Passt die Dauer einer OP an (kürzer ODER länger) und verschiebt alle 
+        Passt die Dauer einer OP an (kürzer/länger) und verschiebt alle 
         nachfolgenden OPs im selben Saal automatisch mit. 
         
-        Vorgehen: Erst wird geprüft, ob die Änderung überhaupt möglich ist 
+        Erst wird geprüft, ob die Änderung überhaupt möglich ist 
         (Saalschluss, Ressourcen-Kollisionen). Erst wenn alles passt, wird 
         die Änderung wirklich übernommen. Geht etwas nicht, bleibt der 
-        ursprüngliche Zustand komplett erhalten (Exception statt Teil-Änderung).
+        ursprüngliche Zustand komplett erhalten.
         """
         if neue_dauer <= 0:
             raise ValueError(f"Fehler: Neue Dauer muss positiv sein (erhalten: {neue_dauer}).")
@@ -123,7 +130,7 @@ class OPManager:
         verschiebung = neue_end_minute - alte_end_minute
 
         if verschiebung == 0:
-            print(f"[HINWEIS] '{op_name}' bleibt unverändert bei {neue_dauer} Minuten.")
+            print(f"[Hinweis] '{op_name}' bleibt unverändert bei {neue_dauer} Minuten.")
             return
 
         # Alle nachfolgenden OPs im selben Saal werden um denselben Betrag mitverschoben
@@ -164,7 +171,7 @@ class OPManager:
 
         # Alles passt: Änderung endgültig übernehmen
         richtung = "kürzer" if verschiebung < 0 else "länger"
-        print(f"\n[ANPASSUNG] '{op_name}' wird um {abs(verschiebung)} Min. {richtung} (neues Ende: {neue_end_minute}).")
+        print(f"\n[Anpassung] '{op_name}' wird um {abs(verschiebung)} Min. {richtung} (neues Ende: {neue_end_minute}).")
 
         for o, neuer_start, neuer_ende in neue_zeiten:
             o.start_minute = neuer_start
@@ -179,7 +186,7 @@ class OPManager:
 
     def zeige_verfuegbare_ressourcen(self, minute: int) -> None:
         """Gibt aus, welches Personal/Geräte/Instrumente zu einer bestimmten Minute frei sind."""
-        print(f"\n[STATUS] Verfügbare Ressourcen zur Minute {minute}:")
+        print(f"\n[Status] Verfügbare Ressourcen zur Minute {minute}:")
 
         for name, ressource in self.ressourcen_pool.items():
             # 1-Minuten-Fenster reicht, um zu prüfen, ob die Ressource gerade frei ist
@@ -189,12 +196,12 @@ class OPManager:
     
     def zeige_ops_von_bis(self, start: int, ende: int) -> None:
         """Zeigt alle geplanten OPs, die (teilweise) im Zeitfenster [start, ende] liegen."""
-        print(f"\n[STATUS] OPs zwischen Minute {start} und {ende}:")
+        print(f"\n[Status] OPs zwischen Minute {start} und {ende}:")
         gefunden = False
 
         for saal in self.saele.values():
             for op in saal.geplante_ops:
-                # Überschneidung: OP beginnt vor Fensterende UND endet nach Fensterbeginn
+                # Überschneidung: OP beginnt vor Fensterende und endet nach Fensterbeginn
                 if op.start_minute < ende and op.end_minute > start:
                     print(f"  - {op.op_name} in {saal.saal_id}: {op.start_minute}-{op.end_minute}")
                     gefunden = True

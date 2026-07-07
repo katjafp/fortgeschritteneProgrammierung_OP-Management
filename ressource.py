@@ -17,7 +17,6 @@ class Ressource:
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
         """Prüft, ob die Ressource im angeforderten Zeitraum einsatzbereit ist."""
-        #wir gehen alle OPs durch die schon im k
         for op in self.geplante_ops:
             if von_minute < op["bis"] and bis_minute > op["von"]:
                 return False
@@ -59,6 +58,9 @@ class Einmalartikel(Ressource):
 
     def konsumiere(self, menge: int) -> None:
         """Prüft das Lager, reduziert den Bestand und warnt bei Unterschreitung des Meldebestands."""
+        if menge <= 0:
+            raise ValueError(f"Fehler: Verbrauchsmenge muss positiv sein (erhalten: {menge}).")
+
         if self.bestand < menge:
             raise ValueError(f"Kritischer Fehler: Nicht genügend Material von '{self.name}' vorhanden!")
         
