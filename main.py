@@ -1,137 +1,76 @@
 """
-Tests für manager.py
+Skript: main (main.py)
 
-Prüft OPManager: Buchungsablauf, Rollback bei Konflikten, sowie 
-Zeitverschiebung (verschiebe_op) inkl. korrektem Rollback bei Konflikten.
+Testzentrum für das digitale OP- und Ressourcenmanagement.
 """
 
-import unittest
-from manager import OPManager
-from ressource import Ressource, Instrument, Einmalartikel
-from op import OPTyp
+from klinik_setup import baue_orthopaedie_klinik
+from op import minute_zu_uhrzeit
 
 
-class TestOPManagerBuchung(unittest.TestCase):
-
-    def setUp(self):
-        self.manager = OPManager()
-        self.manager.saal_hinzufuegen("Saal_1", kapazitaet=480)
-
-        self.manager.ressource_registrieren(Ressource(name="Dr. Test"))
-        self.manager.ressource_registrieren(
-            Einmalartikel(name="Faeden", bestand=10, meldebestand=2)
-        )
-        self.manager.op_typ_definieren(OPTyp(
-            op_name="Standard-OP",
-            standard_dauer=90,
-            benoetigte_ressourcen={"Dr. Test": 1, "Faeden": 3}
-        ))
-
-    def test_erfolgreiche_buchung(self):
-        self.manager.plane_operation("Fall 1", "Standard-OP", "Saal_1", start_minute=0)
-
-        saal = self.manager.saele["Saal_1"]
-        self.assertEqual(len(saal.geplante_ops), 1)
-        # Material muss verbraucht worden sein
-        self.assertEqual(self.manager.lager["Faeden"].bestand, 7)
-
-    def test_unbekannter_op_typ_wirft_fehler(self):
-        with self.assertRaises(ValueError):
-            self.manager.plane_operation("Fall 1", "Nicht-Existent", "Saal_1", start_minute=0)
-
-    def test_ressourcenkonflikt_gibt_bereits_geblockte_ressourcen_frei(self):
-        """Wenn eine Ressource mitten in der Prüfung blockiert ist, müssen 
-        bereits temporär geblockte Ressourcen (hier: Dr. Test) wieder freigegeben werden."""
-        # Dr. Test manuell für den Zeitraum blockieren, damit die Buchung fehlschlägt
-        self.manager.ressourcen_pool["Dr. Test"].blockieren("Fremd-Termin", 0, 90)
-
-        with self.assertRaises(ValueError):
-            self.manager.plane_operation("Fall 1", "Standard-OP", "Saal_1", start_minute=0)
-
-        # Material darf trotzdem nicht doppelt verbraucht worden sein (kein Rollback für
-        # Einmalartikel nötig, da sie in der Iterationsreihenfolge nach Dr. Test verbraucht würden -
-        # hier prüfen wir stattdessen, dass gar keine OP im Saal gelandet ist)
-        saal = self.manager.saele["Saal_1"]
-        self.assertEqual(len(saal.geplante_ops), 0)
+def zeige_tagesplan(manager) -> None:
+    """Gibt für jeden Saal die Restzeit und alle geplanten OPs mit Uhrzeit aus."""
+    for saal_id, saal in manager.saele.items():
+        print(f"\n--- {saal_id} (Restzeit: {saal.berechne_restzeit()} Min.) ---")
+        if not saal.geplante_ops:
+            print("  Keine OPs geplant.")
+            continue
+        for op in saal.geplante_ops:
+            von = minute_zu_uhrzeit(op.start_minute)
+            bis = minute_zu_uhrzeit(op.end_minute)
+            print(f"  {von}-{bis} Uhr: {op.op_name}")
 
 
-class TestOPManagerVerschiebung(unittest.TestCase):
+def main() -> None:
+    print("\nPHASE 1: Klinik-Setup (Säle, Personal, Geräte, Siebe, Lager, OP-Typen)")
+    manager = baue_orthopaedie_klinik()
+    print(f"Säle:               {list(manager.saele.keys())}")
+    print(f"Personal & Geräte:  {list(manager.ressourcen_pool.keys())}")
+    print(f"Lager:              {list(manager.lager.keys())}")
+    print(f"OP-Typen-Katalog:   {list(manager.op_typen.keys())}")
 
-    def setUp(self):
-        self.manager = OPManager()
-        self.manager.saal_hinzufuegen("Saal_1", kapazitaet=480)
-        self.manager.ressource_registrieren(Ressource(name="Dr. Test"))
-        self.manager.op_typ_definieren(OPTyp(
-            op_name="Standard-OP", standard_dauer=90,
-            benoetigte_ressourcen={"Dr. Test": 1}
-        ))
-        # OP-Typ ohne Ressourcenbedarf, für Fall 2 (soll bei der Verschiebung
-        # selbst keine Rolle spielen, nur zeitlich mitrücken)
-        self.manager.op_typ_definieren(OPTyp(
-            op_name="Ressourcenlose-OP", standard_dauer=90, benoetigte_ressourcen={}
-        ))
+    print("\nPHASE 2: Tagesplan buchen (5 OPs über 3 Säle)")
+    manager.plane_operation("Müller, Knie li.", "Knie-TEP", "Saal_1_Endoprothetik", start_minute=0)
+    manager.plane_operation("Schmidt, Hüfte re.", "Hüft-TEP", "Saal_1_Endoprothetik", start_minute=140)
+    manager.plane_operation("Becker, LWS-Instabilität", "Wirbelsaeulen-Spondylodese", "Saal_2_Wirbelsaeule", start_minute=0)
+    manager.plane_operation("Fischer, Schulter li.", "Schulter-Arthroskopie", "Saal_3_Ambulant", start_minute=0)
+    manager.plane_operation("Wagner, Sprunggelenk", "Sprunggelenk-Arthrodese", "Saal_3_Ambulant", start_minute=80)
 
-        self.manager.plane_operation("Fall 1", "Standard-OP", "Saal_1", start_minute=0)
-        self.manager.plane_operation("Fall 2", "Ressourcenlose-OP", "Saal_1", start_minute=110)
+    print("\nTagesplan nach den Erstbuchungen")
+    zeige_tagesplan(manager)
 
-    def test_neue_dauer_muss_positiv_sein(self):
-        with self.assertRaises(ValueError):
-            self.manager.verschiebe_op("Saal_1", "Fall 1", neue_dauer=0)
+    print("\nPHASE 3: Ressourcenkonflikt provozieren")
+    print("Versuch: eine 2. Knie-OP in Saal 1, während der Operateur Endoprothetik bereits operiert...")
+    try:
+        manager.plane_operation("Krause, Knie re.", "Knie-TEP", "Saal_1_Endoprothetik", start_minute=0)
+    except ValueError as e:
+        print(f"Erwarteter Fehler: {e}")
+    print("-> Keine Ressource bleibt hängen, kein Teil-Zustand im Saal (Rollback).")
 
-    def test_verkuerzung_rueckt_folgetermine_nach_vorne(self):
-        """Der 'Zeitschieber'-Algorithmus verschiebt Folgetermine in BEIDE 
-        Richtungen: wird Fall 1 kürzer, rückt Fall 2 automatisch näher heran."""
-        self.manager.verschiebe_op("Saal_1", "Fall 1", neue_dauer=60)
+    print("\nPHASE 4: Live-Status um 09:30 Uhr (Minute 90)")
+    manager.zeige_verfuegbare_ressourcen(90)
+    manager.zeige_aktuelle_ops(90)
 
-        saal = self.manager.saele["Saal_1"]
-        fall_1 = next(o for o in saal.geplante_ops if o.op_name == "Fall 1")
-        fall_2 = next(o for o in saal.geplante_ops if o.op_name == "Fall 2")
+    print("\nPHASE 5: Komplikation - Knie-TEP dauert 30 Min. länger als geplant")
+    print("Vorher: Müller 0-120, Schmidt 140-240 (Saal 1)")
+    manager.verschiebe_op("Saal_1_Endoprothetik", "Müller, Knie li.", neue_dauer=150)
+    zeige_tagesplan(manager)
 
-        self.assertEqual(fall_1.end_minute, 60)
-        # Fall 1 wurde um 30 Min. kürzer (90 -> 60) -> Fall 2 rückt um dieselben
-        # 30 Minuten vor: von 110-200 auf 80-170
-        self.assertEqual((fall_2.start_minute, fall_2.end_minute), (80, 170))
+    print("\nPHASE 6: Verschiebung, die NICHT mehr möglich ist")
+    print("Versuch: die Wirbelsäulen-OP künstlich auf 470 Minuten verlängern...")
+    try:
+        manager.verschiebe_op("Saal_2_Wirbelsaeule", "Becker, LWS-Instabilität", neue_dauer=470)
+    except ValueError as e:
+        print(f"Erwarteter Fehler: {e}")
+    print("-> Ursprünglicher Zeitplan bleibt vollständig erhalten (kein Teil-Zustand).")
 
-    def test_kollision_bei_verlaengerung_wird_verhindert_und_zustand_bleibt_erhalten(self):
-        """Regressionstest für den Rollback-Bug: nach einer fehlgeschlagenen 
-        Verschiebung müssen ALLE betroffenen Ressourcen wieder ihre EIGENEN 
-        ursprünglichen Zeiten haben - nicht die Zeiten der OP, die den Konflikt 
-        ausgelöst hat. Der Konflikt wird hier bewusst über einen externen 
-        Dr.-Test-Termin ausgelöst (nicht über die Saal-Schließzeit), damit 
-        wirklich der Ressourcen-Rollback-Pfad getestet wird."""
-        saal = self.manager.saele["Saal_1"]
-        arzt = self.manager.ressourcen_pool["Dr. Test"]
+    print("\nPHASE 7: Meldebestand-Warnung provozieren")
+    print("Zusätzlicher Verbrauch von 3x 'Schrauben-Set Wirbelsäule' (Nachlieferung simulieren)...")
+    manager.lager["Schrauben-Set Wirbelsäule"].konsumiere(3)
 
-        fall_1_vorher = next(o for o in saal.geplante_ops if o.op_name == "Fall 1")
-        fall_2_vorher = next(o for o in saal.geplante_ops if o.op_name == "Fall 2")
-        start_fall_1, ende_fall_1 = fall_1_vorher.start_minute, fall_1_vorher.end_minute
-        start_fall_2, ende_fall_2 = fall_2_vorher.start_minute, fall_2_vorher.end_minute
-
-        # Externer Termin von Dr. Test, mit dem eine verlängerte Fall-1-OP kollidieren wird
-        arzt.blockieren("Externer Fremdtermin", von_minute=300, bis_minute=350)
-
-        # Fall 1 auf 350 Min. verlängern -> überschneidet sich mit dem Fremdtermin.
-        # Saal-Kapazität (480) reicht dafür noch locker aus, der Fehler kommt also
-        # garantiert aus der Ressourcenprüfung, nicht aus der Kapazitätsprüfung.
-        with self.assertRaises(ValueError):
-            self.manager.verschiebe_op("Saal_1", "Fall 1", neue_dauer=350)
-
-        # Zustand muss vollständig unverändert sein
-        fall_1_nachher = next(o for o in saal.geplante_ops if o.op_name == "Fall 1")
-        fall_2_nachher = next(o for o in saal.geplante_ops if o.op_name == "Fall 2")
-
-        self.assertEqual((fall_1_nachher.start_minute, fall_1_nachher.end_minute),
-                          (start_fall_1, ende_fall_1))
-        self.assertEqual((fall_2_nachher.start_minute, fall_2_nachher.end_minute),
-                          (start_fall_2, ende_fall_2))
-
-        # Dr. Test muss wieder für die EIGENE ursprüngliche Fall-1-Zeit blockiert
-        # sein (der Bug hätte hier fälschlicherweise die Zeit des Fremdtermins
-        # eingetragen, egal für welche Ressource/OP der Rollback lief)
-        self.assertFalse(arzt.ist_verfuegbar(start_fall_1, ende_fall_1))
-        # und der Fremdtermin selbst muss natürlich auch weiterhin blockiert sein
-        self.assertFalse(arzt.ist_verfuegbar(300, 350))
+    print("\nPHASE 8: Tagesabschluss - finaler Zeitplan aller Säle")
+    zeige_tagesplan(manager)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

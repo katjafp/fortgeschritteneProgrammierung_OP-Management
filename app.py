@@ -3,36 +3,12 @@ Datei: app.py
 Streamlit-Oberfläche für das digitale OP-Planungs- & Ressourcenmanagement.
 """
 
-import streamlit as st
-from manager import OPManager
-from ressource import Ressource, Instrument, Einmalartikel
-from op import OPTyp, minute_zu_uhrzeit
+import streamlit as st 
+from op import minute_zu_uhrzeit
+from klinik_setup import baue_orthopaedie_klinik
 
-st.set_page_config(page_title="OP-Planung", layout="wide")
-
-def initialisiere_system() -> OPManager:
-    """Baut den Manager EINMAL auf und befüllt ihn mit Testdaten (Klinik-Setup)."""
-    manager = OPManager()
-
-    manager.saal_hinzufuegen("Zentral-OP_Saal_1", kapazitaet=480)
-    manager.saal_hinzufuegen("Ambulant_Saal_2", kapazitaet=360)
-
-    manager.ressource_registrieren(Ressource(name="Dr. Müller (Anästhesie)"))
-    manager.ressource_registrieren(Ressource(name="Mobiles Röntgengerät C-Bogen"))
-    manager.ressource_registrieren(Instrument(name="Chirurgisches Knie-TEP-Sieb basic"))
-    manager.ressource_registrieren(Einmalartikel(name="Nahtmaterial Vicryl 3-0", bestand=50, meldebestand=10))
-
-    manager.op_typ_definieren(OPTyp(
-        op_name="Knie-Endoprothese",
-        standard_dauer=90,
-        benoetigte_ressourcen={"Nahtmaterial Vicryl 3-0": 3}
-    ))
-    return manager
-
-
-# Nur beim ALLERERSTEN Rerun aufbauen - danach bleibt der Manager erhalten
 if "manager" not in st.session_state:
-    st.session_state.manager = initialisiere_system()
+    st.session_state.manager = baue_orthopaedie_klinik()
 
 manager = st.session_state.manager
 

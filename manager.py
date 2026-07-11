@@ -52,13 +52,16 @@ class OPManager:
 
         op_name: eindeutiger Bezeichner der konkreten Buchung (z.B. "Knie-OP Patient Müller")
         op_typ_name: Name des Rezepts im Katalog (z.B. "Knie-Endoprothese")
+
+        Ablauf: Erst wird ALLES geprüft (Saal, Personal/Geräte, Lagerbestand),
+        erst wenn alles passt, wird wirklich etwas verändert. So bleibt bei
+        einem Fehler keine Ressource fälschlich blockiert oder verbraucht.
         """
         print(f"\n[Buchung] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
 
         if start_minute < 0:
             raise ValueError(f"Fehler: Startminute muss 0 oder positiv sein (erhalten: {start_minute}).")
 
-        # OP-Rezept anhand des TYP-Namens holen
         if op_typ_name not in self.op_typen:
             raise ValueError(f"Fehler: Der OP-Typ '{op_typ_name}' ist nicht im System definiert!")
         rezept = self.op_typen[op_typ_name]
@@ -68,41 +71,36 @@ class OPManager:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
 
-        # Neue OP-Instanz anlegen — sie bekommt den eindeutigen Buchungs-Namen
         neue_op = OP(op_name, saal_id, start_minute, dauer)
 
-        temporaer_geblockt = []
-
+        # Phase 1: NUR PRÜFEN - hier wird noch nichts verändert
         for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
             if ressourcen_name in self.lager:
                 artikel = self.lager[ressourcen_name]
-                artikel.konsumiere(benoetigte_menge)
+                if artikel.bestand < benoetigte_menge:
+                    raise ValueError(f"Kritischer Fehler: Nicht genügend Material von '{ressourcen_name}' vorhanden!")
 
             elif ressourcen_name in self.ressourcen_pool:
                 ressource = self.ressourcen_pool[ressourcen_name]
-
-                ist_frei = ressource.ist_verfuegbar(start_minute, start_minute + dauer)
-
-                if not ist_frei:
-                    for r in temporaer_geblockt:
-                        r.freigeben(op_name)
+                if not ressource.ist_verfuegbar(start_minute, start_minute + dauer):
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
-
-                ressource.blockieren(op_name, start_minute, start_minute + dauer)
-        
-                temporaer_geblockt.append(ressource)
-                neue_op.geblockte_ressourcen.append(ressource)
 
             else:
                 raise ValueError(f"Fehler: Die geforderte Ressource '{ressourcen_name}' existiert nicht!")
 
-        try:
-            saal.op_hinzufuegen(neue_op)
-            print(f"'{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
-        except ValueError as e:
-            for r in temporaer_geblockt:
-                r.freigeben(op_name)
-            raise e
+        # Prüft zusätzlich Saal-Zeitfenster und bucht die OP verbindlich in den Saal ein
+        saal.op_hinzufuegen(neue_op)
+
+        # Phase 2: Alles geprüft und Saal gebucht -> jetzt erst wirklich verbrauchen/blockieren
+        for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
+            if ressourcen_name in self.lager:
+                self.lager[ressourcen_name].konsumiere(benoetigte_menge)
+            else:
+                ressource = self.ressourcen_pool[ressourcen_name]
+                ressource.blockieren(op_name, start_minute, start_minute + dauer)
+                neue_op.geblockte_ressourcen.append(ressource)
+
+        print(f"'{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
 
     def verschiebe_op(self, saal_id: str, op_name: str, neue_dauer: int) -> None:
         """
