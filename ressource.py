@@ -69,3 +69,25 @@ class Einmalartikel(Ressource):
         # Automatischer Nachbestell-Trigger
         if self.bestand <= self.meldebestand:
             print(f"Warnung! Meldebestand für '{self.name}' unterschritten! Aktueller Bestand: {self.bestand}")
+
+class RessourcenPool(Ressource):
+    """Erbt von Ressource. Bildet mehrere GLEICHARTIGE Einheiten ab (z.B. 3 Operateure
+    derselben Fachrichtung), die als eine gemeinsame Ressource verwaltet werden.
+
+    Statt 'frei oder belegt' (wie bei der Basisklasse) wird gezählt, wie viele
+    Einheiten zeitgleich schon gebucht sind. Erst wenn alle 'anzahl' Einheiten
+    gleichzeitig belegt sind, gilt der Pool als voll."""
+
+    def __init__(self, name: str, anzahl: int):
+        super().__init__(name)
+        if anzahl <= 0:
+            raise ValueError(f"Fehler: Anzahl muss positiv sein (erhalten: {anzahl}).")
+        self.anzahl: int = anzahl
+
+    def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
+        """Frei, solange nicht bereits 'anzahl' Buchungen im selben Zeitraum liegen."""
+        ueberschneidungen = sum(
+            1 for op in self.geplante_ops
+            if von_minute < op["bis"] and bis_minute > op["von"]
+        )
+        return ueberschneidungen < self.anzahl

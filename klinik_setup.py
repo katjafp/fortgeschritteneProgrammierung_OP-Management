@@ -7,7 +7,7 @@ Siebe, Verbrauchsmaterial und die dazugehörigen OP-Typen.
 """
 
 from manager import OPManager
-from ressource import Ressource, Instrument, Einmalartikel
+from ressource import Ressource, Instrument, Einmalartikel, RessourcenPool
 from op import OPTyp
 
 
@@ -27,19 +27,19 @@ def baue_orthopaedie_klinik() -> OPManager:
     manager.saal_hinzufuegen("Saal_3_Ambulant", kapazitaet=360)       # 08:00-14:00
 
     # 2. Personal: reine Funktionsbezeichnung
-    personal = [
-        "Operateur Endoprothetik",
-        "Operateur Wirbelsäule",
-        "Operateur Schulter/Fuß",
-        "Anästhesist Saal 1",
-        "Anästhesist Saal 2",
-        "Anästhesist Saal 3",
-        "OP-Pflege Saal 1",
-        "OP-Pflege Saal 2",
-        "OP-Pflege Saal 3",
-    ]
-    for name in personal:
-        manager.ressource_registrieren(Ressource(name=name))
+    personal = {
+        "Operateur Endoprothetik": 3,
+        "Operateur Wirbelsäule": 2,
+        "Operateur Schulter/Fuß": 2,
+        "Anästhesist": 5,
+        "OP-Pflege": 7
+    }
+    for name, anzahl in personal.items():
+        if anzahl == 1:
+            manager.ressource_registrieren(Ressource(name=name))
+        else:
+            manager.ressource_registrieren(RessourcenPool(name=name, anzahl=anzahl))
+
 
     # 3. Geräte
     geraete = ["C-Bogen Saal 1", "Navigationssystem Saal 2", "Arthroskopie-Turm Saal 3", "C-Bogen Saal 3"]
@@ -64,8 +64,8 @@ def baue_orthopaedie_klinik() -> OPManager:
         standard_dauer=120,
         benoetigte_ressourcen={
             "Operateur Endoprothetik": 1,
-            "Anästhesist Saal 1": 1,
-            "OP-Pflege Saal 1": 1,
+            "Anästhesist": 1,
+            "OP-Pflege": 2,
             "C-Bogen Saal 1": 1,
             "Knie-TEP-Sieb": 1,
             "Knochenzement Palacos": 2,
@@ -77,8 +77,8 @@ def baue_orthopaedie_klinik() -> OPManager:
         standard_dauer=100,
         benoetigte_ressourcen={
             "Operateur Endoprothetik": 1,
-            "Anästhesist Saal 1": 1,
-            "OP-Pflege Saal 1": 1,
+            "Anästhesist": 1,
+            "OP-Pflege": 1,
             "C-Bogen Saal 1": 1,
             "Hüft-TEP-Sieb": 1,
             "Knochenzement Palacos": 2,
@@ -90,8 +90,8 @@ def baue_orthopaedie_klinik() -> OPManager:
         standard_dauer=180,
         benoetigte_ressourcen={
             "Operateur Wirbelsäule": 1,
-            "Anästhesist Saal 2": 1,
-            "OP-Pflege Saal 2": 1,
+            "Anästhesist": 1,
+            "OP-Pflege": 1,
             "Navigationssystem Saal 2": 1,
             "Wirbelsäulen-Sieb": 1,
             "Schrauben-Set Wirbelsäule": 1,
@@ -103,8 +103,8 @@ def baue_orthopaedie_klinik() -> OPManager:
         standard_dauer=60,
         benoetigte_ressourcen={
             "Operateur Schulter/Fuß": 1,
-            "Anästhesist Saal 3": 1,
-            "OP-Pflege Saal 3": 1,
+            "Anästhesist": 1,
+            "OP-Pflege": 1,
             "Arthroskopie-Turm Saal 3": 1,
             "Schulter-Arthroskopie-Sieb": 1,
             "Fadenanker Schulter": 2,
@@ -116,8 +116,8 @@ def baue_orthopaedie_klinik() -> OPManager:
         standard_dauer=90,
         benoetigte_ressourcen={
             "Operateur Schulter/Fuß": 1,
-            "Anästhesist Saal 3": 1,
-            "OP-Pflege Saal 3": 1,
+            "Anästhesist": 1,
+            "OP-Pflege": 1,
             "C-Bogen Saal 3": 1,
             "Sprunggelenk-Sieb": 1,
             "Nahtmaterial Vicryl 3-0": 3,

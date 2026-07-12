@@ -18,12 +18,14 @@ def minute_zu_uhrzeit(minute: int, schichtbeginn: str = "08:00") -> str:
     rest_minute = gesamt_minuten % 60
     return f"{stunde:02d}:{rest_minute:02d}"
 
-class OPTyp:
-    """Definiert eine OP-Art mit ihrer Standard-Dauer und den benötigten Ressourcen."""
-    def __init__(self, op_name: str, standard_dauer: int, benoetigte_ressourcen: dict[str, int]):
+class OP:
+    """Repräsentiert eine konkret geplante Operation auf dem Zeitstrahl."""
+    def __init__(self, op_name: str, saal_id: str, start_minute: int, dauer: int):
         self.op_name: str = op_name
-        self.standard_dauer: int = standard_dauer
-        self.benoetigte_ressourcen: dict[str, int] = benoetigte_ressourcen
+        self.saal_id: str = saal_id
+        self.start_minute: int = start_minute
+        self.end_minute: int = start_minute + dauer
+        self.geblockte_ressourcen: list[Ressource] = []
 
 
 class OPTyp:
