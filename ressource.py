@@ -16,9 +16,12 @@ class Ressource:
         self.geplante_ops: list[dict]=[]
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
-        """Prüft, ob die Ressource im angeforderten Zeitraum einsatzbereit ist."""
-        for op in self.geplante_ops:
-            if von_minute < op["bis"] and bis_minute > op["von"]:
+        """Frei, wenn zu keinem Zeitpunkt mehr als 'anzahl' Buchungen gleichzeitig
+        aktiv wären (inkl. der neuen, testweise hinzugefügten Anfrage)."""
+        alle = [(op["von"], op["bis"]) for op in self.geplante_ops] + [(von_minute, bis_minute)]
+        for start, _ in alle:
+            aktive = sum(1 for von, bis in alle if von <= start < bis)
+            if aktive > self.anzahl:
                 return False
         return True
 
@@ -63,14 +66,13 @@ class Einmalartikel(Ressource):
 
     def konsumiere(self, menge: int) -> None:
         """Prüft das Lager, reduziert den Bestand und warnt bei Unterschreitung des Meldebestands."""
-        if menge <= 0:
-            raise ValueError(f"Fehler: Verbrauchsmenge muss positiv sein (erhalten: {menge}).")
+        if not isinstance(menge, int) or isinstance(menge, bool) or menge <= 0:
+            raise ValueError(f"Fehler: Verbrauchsmenge muss eine positive ganze Zahl sein (erhalten: {menge!r}).")
 
         if self.bestand < menge:
             raise ValueError(f"Kritischer Fehler: Nicht genügend Material von '{self.name}' vorhanden!")
         
-        self.bestand -= menge
-        
+        self.bestand -= menge        
         # Automatischer Nachbestell-Trigger
         if self.bestand <= self.meldebestand:
             print(f"Warnung! Meldebestand für '{self.name}' unterschritten! Aktueller Bestand: {self.bestand}")
