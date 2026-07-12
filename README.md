@@ -3,10 +3,10 @@
 Ein Python-Projekt zur digitalen Verwaltung von OP-Sälen, Personal, Geräten,chirurgischen Instrumenten und Verbrauchsmaterial in einer Klinik. Das System prüft bei jeder Buchung automatisch alle benötigten Ressourcen, verwaltet Lagerbestände und kann bereits geplante Operationen zeitlich verschieben (inkl. automatischer Anpassung aller Folgetermine im selben Saal).
 
 ## Installation & Ausführung
-
+Voraussetzung: Python 3.9 oder neuer.
 ```bash
 python -m venv venv
-source venv/bin/activate      
+source venv/Scripts/activate      
 pip install -r requirements.txt
 ```
 
@@ -31,10 +31,11 @@ python testmanager.py
 
 ## Aufbau
 
-Drei Kernklassen bilden über Vererbung die Ressourcen ab:
-- `Ressource` ist die Basisklasse für alles, was für eine OP blockiert werden kann (z.B. ein Arzt oder ein Röntgengerät).
+Vier Kernklassen bilden über Vererbung die Ressourcen ab:
+- `Ressource` ist die Basisklasse für alles, was für eine OP blockiert werden kann (z.B. ein Arzt oder ein Röntgengerät). Sie bildet immer genau ein Exemplar ab - schon eine einzige Überschneidung zweier Zeiträume gilt als Konflikt.
 - `Instrument` erbt davon und braucht nach jeder Nutzung automatisch eine Sterilisationszeit, bevor es wieder einsatzbereit ist.
 - `Einmalartikel` erbt ebenfalls davon, hat aber statt einer Zeitplanung einen Lagerbestand mit Meldebestand-Warnung.
+- `RessourcenPool` erbt ebenfalls von `Ressource` und bildet mehrere gleichartige Einheiten ab (z.B. 3 Operateure derselben Fachrichtung oder 2 mobile C-Bögen). Statt "frei oder belegt" wird geprüft, ob zu irgendeinem Zeitpunkt mehr Einheiten gleichzeitig gebraucht würden, als der Pool hat.
 
 Für die Zeitplanung gibt es `OPTyp` (das "Rezept" – wie lange dauert eine Knie-OP normalerweise, was wird dafür gebraucht), `OP` (eine konkret gebuchte Operation) und `OPSaal` (verwaltet, welche OPs wann in welchem Saal laufen, inkl. Reinigungszeiten zwischen zwei OPs).
 
@@ -49,7 +50,7 @@ Den Überblick über alles hat der `OPManager`: Er verbindet die Ressourcen mit 
 1. OP-Typ ("Rezept") anhand des Namens aus dem Katalog holen
 2. Für jede benötigte Ressource prüfen: Einmalartikel → Lagerbestand verbrauchen; Personal/Gerät/Instrument → Verfügbarkeit im Zeitraum prüfen
 3. Sind alle Ressourcen frei, werden sie blockiert und die OP wird im `OPSaal` eingetragen
-4. Zuerst werden alle benötigten Ressourcen geprüft (Verfügbarkeit, Lagerbestand), ohne etwas zu verändern. Erst wenn alle Prüfungen erfolgreich sind, werden die Ressourcen wirklich blockiert bzw. verbraucht. So bleibt bei einem Fehler kein Teil-Zustand hängen.
+4. Zuerst werden alle benötigten Ressourcen geprüft (Verfügbarkeit, Lagerbestand, gültige positive Mengen), ohne etwas zu verändern. Erst wenn alle Prüfungen erfolgreich sind, werden die Ressourcen wirklich blockiert bzw. verbraucht. Sollte dabei trotzdem unerwartet ein Fehler auftreten, wird der komplette Teil-Zustand automatisch zurückgerollt (Saal-Eintrag entfernen, bereits blockierte Ressourcen freigeben, bereits verbrauchtes Material zurückbuchen) - so bleibt bei einem Fehler nie ein Teil-Zustand hängen.
 
 ### Verschieben einer OP (`verschiebe_op`)
 
@@ -60,3 +61,7 @@ nachfolgenden OPs im selben Saal um denselben Betrag (in beide Richtungen: kürz
 2. Sind alle beteiligten Ressourcen zu den neuen Zeiten noch verfügbar?
 
 Nur wenn beide Prüfungen erfolgreich sind, wird die Änderung übernommen – andernfalls bleibt der komplette ursprüngliche Zustand erhalten.
+
+### Mehrere OPs auf einmal buchen (`plane_mehrere_operationen`)
+
+Für Stapelverarbeitung (z.B. einen kompletten Tagesplan auf einmal einbuchen) nimmt `plane_mehrere_operationen()` eine Liste von Buchungen entgegen und versucht jede einzeln über `plane_operation()`. Anders als bei einem direkten Aufruf von `plane_operation()` bricht ein fehlgeschlagener Einzelversuch hier nicht die gesamte Stapelverarbeitung ab - jede Buchung wird unabhängig versucht, und für jede wird das Ergebnis (erfolgreich oder nicht, inkl.Fehlermeldung) zurückgegeben. 
