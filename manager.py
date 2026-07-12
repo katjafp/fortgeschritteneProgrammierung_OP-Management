@@ -20,16 +20,21 @@ class OPManager:
 
     def saal_hinzufuegen(self, saal_id: str, kapazitaet: int = 480) -> None:
         """Registriert einen neuen OP-Saal im System."""
+        if saal_id in self.saele:
+            raise ValueError(f"Fehler: Ein Saal mit der ID '{saal_id}' ist bereits registriert!")
         self.saele[saal_id] = OPSaal(saal_id, kapazitaet)
-        print(f"[SYSTEM] Saal '{saal_id}' erfolgreich mit {kapazitaet} Min. Schichtzeit registriert.")
+        print(f"[System] Saal '{saal_id}' erfolgreich mit {kapazitaet} Min. Schichtzeit registriert.")
 
     def ressource_registrieren(self, ressource: Ressource) -> None:
         """Fügt Personal oder Geräte dem Ressourcen Pool hinzu oder sortiert Einmalartikel ins Lager ein."""
+        name = ressource.name
+        if name in self.lager or name in self.ressourcen_pool:
+            raise ValueError(f"Fehler: Der Name '{name}' ist bereits als Ressource registriert!")
         if isinstance(ressource, Einmalartikel):
-            self.lager[ressource.name] = ressource
+            self.lager[name] = ressource
         else:
-            self.ressourcen_pool[ressource.name] = ressource
-
+            self.ressourcen_pool[name] = ressource
+            
     def lager_material_ein(self, name: str, menge: int) -> None:
         """Erhöht den Bestand eines Einmalartikels im Lager, z.B. bei Anlieferung."""
         if menge <= 0:
@@ -53,19 +58,21 @@ class OPManager:
         op_name: eindeutiger Bezeichner der konkreten Buchung (z.B. "Knie-OP Patient Müller")
         op_typ_name: Name des Rezepts im Katalog (z.B. "Knie-Endoprothese")
 
-        Ablauf: Erst wird ALLES geprüft (Saal, Personal/Geräte, Lagerbestand),
-        erst wenn alles passt, wird wirklich etwas verändert. So bleibt bei
-        einem Fehler keine Ressource fälschlich blockiert oder verbraucht.
+        Ablauf: Erst wird alles geprüft (Saal, Personal/Geräte, Lagerbestand),
+        erst wenn alles passt, wird wirklich etwas verändert.
         """
         print(f"\n[Buchung] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
-
+        #verhindert leere Eingaben & Leerzeichen 
+        if not op_name or not op_name.strip():
+            raise ValueError("Fehler: Der Name darf nicht leer sein. - Bitte um Eingabe.")
+        #verhindert von Doppelbuchungen
         for saal in self.saele.values():
             if any(o.op_name == op_name for o in saal.geplante_ops):
-                raise ValueError(f"Fehler: Der Bezeichner '{op_name}' ist bereits vergeben. Bitte eindeutigen Namen wählen.")
+                raise ValueError(f"Fehler: Der Name '{op_name}' ist bereits vergeben. Bitte eindeutigen Namen wählen.")
             
-        if not isinstance(start_minute, int):
-            raise ValueError(f"Fehler: Startminute muss eine ganze Zahl sein (erhalten: {start_minute!r}).")
-
+        if not isinstance(start_minute, int) or isinstance(start_minute, bool):
+            raise ValueError(f"Fehler: Startminute muss eine ganze Zahl sein (erhalten: {start_minute!r}).")        #verhindert negative Eingaben
+        
         if start_minute < 0:
             raise ValueError(f"Fehler: Startminute muss 0 oder positiv sein (erhalten: {start_minute}).")
 
@@ -73,15 +80,21 @@ class OPManager:
             raise ValueError(f"Fehler: Der OP-Typ '{op_typ_name}' ist nicht im System definiert!")
         rezept = self.op_typen[op_typ_name]
         dauer = rezept.standard_dauer
-
+        
+        #verhindert Eingabe nicht vorhandener Saal
         if saal_id not in self.saele:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
 
         neue_op = OP(op_name, saal_id, start_minute, dauer)
 
-        # Phase 1: NUR PRÜFEN - hier wird noch nichts verändert
+        # Prüfung - vorhandene Ressourcen 
         for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
+            if not isinstance(benoetigte_menge, int) or isinstance(benoetigte_menge, bool) or benoetigte_menge <= 0:
+                raise ValueError(
+                    f"Fehler: Benötigte Menge für '{ressourcen_name}' im OP-Typ '{op_typ_name}' muss eine positive ganze Zahl sein (erhalten: {benoetigte_menge})."
+                )
+
             if ressourcen_name in self.lager:
                 artikel = self.lager[ressourcen_name]
                 if artikel.bestand < benoetigte_menge:
@@ -97,17 +110,45 @@ class OPManager:
 
         # Prüft zusätzlich Saal-Zeitfenster und bucht die OP verbindlich in den Saal ein
         saal.op_hinzufuegen(neue_op)
-
-        # Phase 2: Alles geprüft und Saal gebucht -> jetzt erst wirklich verbrauchen/blockieren
-        for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
-            if ressourcen_name in self.lager:
-                self.lager[ressourcen_name].konsumiere(benoetigte_menge)
-            else:
-                ressource = self.ressourcen_pool[ressourcen_name]
-                ressource.blockieren(op_name, start_minute, start_minute + dauer)
-                neue_op.geblockte_ressourcen.append(ressource)
+        
+        # geprüft + Saal blockiert ->Ressourcen werden blockiert
+        verbrauchtes_material: list[tuple[Einmalartikel, int]] = []
+        try:
+            for ressourcen_name, benoetigte_menge in rezept.benoetigte_ressourcen.items():
+                if ressourcen_name in self.lager:
+                    self.lager[ressourcen_name].konsumiere(benoetigte_menge)
+                    verbrauchtes_material.append((self.lager[ressourcen_name], benoetigte_menge))
+                else:
+                    ressource = self.ressourcen_pool[ressourcen_name]
+                    ressource.blockieren(op_name, start_minute, start_minute + dauer)
+                    neue_op.geblockte_ressourcen.append(ressource)
+        except Exception:
+            # Rollback: Saal-Eintrag entfernen
+            saal.geplante_ops.remove(neue_op)
+            # Rollback: bereits blockierte Ressourcen wieder freigeben
+            for ressource in neue_op.geblockte_ressourcen:
+                ressource.freigeben(op_name)
+            # Rollback: bereits verbrauchtes Material zurückbuchen
+            for artikel, menge in verbrauchtes_material:
+                artikel.bestand += menge
+            raise
 
         print(f"'{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
+        
+    def plane_mehrere_operationen(self, buchungen: list[tuple[str, str, str, int]]) -> list[dict]:
+        """
+        Bucht mehrere OPs nacheinander über plane_operation(). Ein fehlgeschlagener
+        Einzelversuch bricht nicht die gesamte Stapelverarbeitung ab: jede Buchung
+        wird unabhängig versucht, das Ergebnis wird gesammelt und zurückgegeben.
+        """
+        ergebnisse: list[dict] = []
+        for op_name, op_typ_name, saal_id, start_minute in buchungen:
+            try:
+                self.plane_operation(op_name, op_typ_name, saal_id, start_minute=start_minute)
+                ergebnisse.append({"op_name": op_name, "erfolgreich": True})
+            except ValueError as e:
+                ergebnisse.append({"op_name": op_name, "erfolgreich": False, "fehler": str(e)})
+        return ergebnisse
 
     def verschiebe_op(self, saal_id: str, op_name: str, neue_dauer: int) -> None:
         """
@@ -119,9 +160,12 @@ class OPManager:
         die Änderung wirklich übernommen. Geht etwas nicht, bleibt der 
         ursprüngliche Zustand komplett erhalten.
         """
+        if not isinstance(neue_dauer, int):
+            raise ValueError(f"Fehler: Neue Dauer muss eine ganze Zahl sein (erhalten: {neue_dauer!r}).")
+
         if neue_dauer <= 0:
             raise ValueError(f"Fehler: Neue Dauer muss positiv sein (erhalten: {neue_dauer}).")
-
+        
         if saal_id not in self.saele:
             raise ValueError(f"Fehler: Der OP-Saal '{saal_id}' existiert nicht!")
         saal = self.saele[saal_id]
@@ -146,13 +190,12 @@ class OPManager:
         for folge_op in folge_ops:
             neue_zeiten.append((folge_op, folge_op.start_minute + verschiebung, folge_op.end_minute + verschiebung))
 
-        # Prüfung 1: Überschreitet die letzte betroffene OP die Schließzeit des Saals?
+        # Prüfung: Überschreitet die letzte betroffene OP die Schließzeit des Saals?
         letzte_neue_end_minute = neue_zeiten[-1][2]
         if letzte_neue_end_minute + saal.reinigung > saal.kapazitaet_minute:
             raise ValueError(f"Verschiebung nicht möglich: {saal_id} würde über die Schließzeit hinaus belegt!")
 
-        # Prüfung 2: Sind alle Ressourcen zu den NEUEN Zeiten noch verfügbar?
-        # Dazu geben wir die betroffenen Ressourcen testweise frei und prüfen dann.
+        # Prüfung: Sind alle Ressourcen zu den neuen Zeiten noch verfügbar?
         for o, _, _ in neue_zeiten:
             for ressource in o.geblockte_ressourcen:
                 ressource.freigeben(o.op_name)
