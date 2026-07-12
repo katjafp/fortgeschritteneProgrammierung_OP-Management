@@ -40,12 +40,11 @@ def baue_orthopaedie_klinik() -> OPManager:
         else:
             manager.ressource_registrieren(RessourcenPool(name=name, anzahl=anzahl))
 
-
     # Geräte
     manager.ressource_registrieren(RessourcenPool(name="C-Bogen", anzahl=2))
-    geraete = ["C-Bogen", "Navigationssystem", "Arthroskopie-Turm"]
+    geraete = ["Navigationssystem", "Arthroskopie-Turm"]
     for name in geraete:
-        manager.ressource_registrieren(Ressource(name=name))
+        manager.ressource_registrieren(Ressource(name=name))    
     
     # Chirurgische Siebe (Instrument = Ressource + Sterilisationszeit)
     siebe = ["Knie-TEP-Sieb", "Hüft-TEP-Sieb", "Wirbelsäulen-Sieb",

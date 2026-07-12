@@ -16,12 +16,9 @@ class Ressource:
         self.geplante_ops: list[dict]=[]
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
-        """Frei, wenn zu keinem Zeitpunkt mehr als 'anzahl' Buchungen gleichzeitig
-        aktiv wären (inkl. der neuen, testweise hinzugefügten Anfrage)."""
-        alle = [(op["von"], op["bis"]) for op in self.geplante_ops] + [(von_minute, bis_minute)]
-        for start, _ in alle:
-            aktive = sum(1 for von, bis in alle if von <= start < bis)
-            if aktive > self.anzahl:
+        """Frei, wenn sich kein bereits gebuchter Zeitraum mit dem angefragten überschneidet."""
+        for op in self.geplante_ops:
+            if von_minute < op["bis"] and bis_minute > op["von"]:
                 return False
         return True
 
@@ -80,10 +77,7 @@ class Einmalartikel(Ressource):
 class RessourcenPool(Ressource):
     """Erbt von Ressource. Bildet mehrere gleichartige Einheiten ab (z.B. 3 Operateure
     derselben Fachrichtung), die als eine gemeinsame Ressource verwaltet werden.
-
-    Statt 'frei oder belegt' (wie bei der Basisklasse) wird gezählt, wie viele
-    Einheiten zeitgleich schon gebucht sind. Erst wenn alle 'anzahl' Einheiten
-    gleichzeitig belegt sind, gilt der Pool als voll."""
+    """
 
     def __init__(self, name: str, anzahl: int):
         super().__init__(name)
@@ -92,9 +86,11 @@ class RessourcenPool(Ressource):
         self.anzahl: int = anzahl
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
-        """Frei, solange nicht bereits 'anzahl' Buchungen im selben Zeitraum liegen."""
-        ueberschneidungen = sum(
-            1 for op in self.geplante_ops
-            if von_minute < op["bis"] and bis_minute > op["von"]
-        )
-        return ueberschneidungen < self.anzahl
+        """Frei, wenn zu keinem Zeitpunkt mehr als 'anzahl' Buchungen gleichzeitig
+        aktiv wären (inkl. der neuen, testweise hinzugefügten Anfrage)."""
+        alle = [(op["von"], op["bis"]) for op in self.geplante_ops] + [(von_minute, bis_minute)]
+        for start, _ in alle:
+            aktive = sum(1 for von, bis in alle if von <= start < bis)
+            if aktive > self.anzahl:
+                return False
+        return True
