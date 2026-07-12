@@ -25,8 +25,7 @@ class OP:
         self.saal_id: str = saal_id
         self.start_minute: int = start_minute
         self.end_minute: int = start_minute + dauer
-        self.geblockte_ressourcen: list[Ressource] = []
-
+        self.geblockte_ressourcen: list[tuple[Ressource, int]] = []
 
 class OPTyp:
     """Definiert eine OP-Art mit ihrer Standard-Dauer und den benötigten Ressourcen."""

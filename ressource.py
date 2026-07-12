@@ -22,13 +22,8 @@ class Ressource:
                 return False
         return True
 
-    def blockieren(self, op_name: str, von_minute: int, bis_minute: int) -> None:
-        """Reserviert die Ressource für eine bestimmte Operation."""
-        karteikarte = {
-            "name": op_name,
-            "von": von_minute,
-            "bis": bis_minute
-        }
+    def blockieren(self, op_name: str, von_minute: int, bis_minute: int, menge: int = 1) -> None:
+        karteikarte = {"name": op_name, "von": von_minute, "bis": bis_minute, "menge": menge}
         self.geplante_ops.append(karteikarte)
 
     def freigeben(self, op_name:str) -> None:
@@ -85,12 +80,12 @@ class RessourcenPool(Ressource):
             raise ValueError(f"Fehler: Anzahl muss positiv sein (erhalten: {anzahl}).")
         self.anzahl: int = anzahl
 
-    def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
+    def ist_verfuegbar(self, von_minute: int, bis_minute: int, menge: int = 1) -> bool:
         """Frei, wenn zu keinem Zeitpunkt mehr als 'anzahl' Buchungen gleichzeitig
         aktiv wären (inkl. der neuen, testweise hinzugefügten Anfrage)."""
-        alle = [(op["von"], op["bis"]) for op in self.geplante_ops] + [(von_minute, bis_minute)]
-        for start, _ in alle:
-            aktive = sum(1 for von, bis in alle if von <= start < bis)
+        alle = [(op["von"], op["bis"], op["menge"]) for op in self.geplante_ops] + [(von_minute, bis_minute, menge)]
+        for start, _, _ in alle:
+            aktive = sum(m for von, bis, m in alle if von <= start < bis)
             if aktive > self.anzahl:
                 return False
         return True

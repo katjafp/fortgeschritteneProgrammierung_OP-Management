@@ -34,7 +34,7 @@ class OPManager:
             self.lager[name] = ressource
         else:
             self.ressourcen_pool[name] = ressource
-            
+
     def lager_material_ein(self, name: str, menge: int) -> None:
         """Erhöht den Bestand eines Einmalartikels im Lager, z.B. bei Anlieferung."""
         if menge <= 0:
@@ -102,9 +102,8 @@ class OPManager:
 
             elif ressourcen_name in self.ressourcen_pool:
                 ressource = self.ressourcen_pool[ressourcen_name]
-                if not ressource.ist_verfuegbar(start_minute, start_minute + dauer):
+                if not ressource.ist_verfuegbar(start_minute, start_minute + dauer, benoetigte_menge):
                     raise ValueError(f"Buchungs-Konflikt: Die Ressource '{ressourcen_name}' ist aktuell belegt!")
-
             else:
                 raise ValueError(f"Fehler: Die geforderte Ressource '{ressourcen_name}' existiert nicht!")
 
@@ -118,20 +117,21 @@ class OPManager:
                 if ressourcen_name in self.lager:
                     self.lager[ressourcen_name].konsumiere(benoetigte_menge)
                     verbrauchtes_material.append((self.lager[ressourcen_name], benoetigte_menge))
-                else:
-                    ressource = self.ressourcen_pool[ressourcen_name]
-                    ressource.blockieren(op_name, start_minute, start_minute + dauer)
-                    neue_op.geblockte_ressourcen.append(ressource)
-        except Exception:
-            # Rollback: Saal-Eintrag entfernen
-            saal.geplante_ops.remove(neue_op)
-            # Rollback: bereits blockierte Ressourcen wieder freigeben
-            for ressource in neue_op.geblockte_ressourcen:
-                ressource.freigeben(op_name)
-            # Rollback: bereits verbrauchtes Material zurückbuchen
-            for artikel, menge in verbrauchtes_material:
-                artikel.bestand += menge
-            raise
+        else:
+            ressource = self.ressourcen_pool[ressourcen_name]
+            ressource.blockieren(op_name, start_minute, start_minute + dauer, benoetigte_menge)
+            neue_op.geblockte_ressourcen.append((ressource, benoetigte_menge))
+
+           except Exception:
+                # Rollback: Saal-Eintrag entfernen
+                saal.geplante_ops.remove(neue_op)
+                # Rollback: bereits blockierte Ressourcen wieder freigeben
+                for ressource, menge in neue_op.geblockte_ressourcen:
+                    ressource.freigeben(op_name)
+                # Rollback: bereits verbrauchtes Material zurückbuchen
+                for artikel, menge in verbrauchtes_material:
+                    artikel.bestand += menge
+                raise
 
         print(f"'{op_name}' wurde für {saal_id} (Minute {start_minute} bis {start_minute + dauer}) fest gebucht!")
         
@@ -197,13 +197,13 @@ class OPManager:
 
         # Prüfung: Sind alle Ressourcen zu den neuen Zeiten noch verfügbar?
         for o, _, _ in neue_zeiten:
-            for ressource in o.geblockte_ressourcen:
+            for ressource, menge in o.geblockte_ressourcen:
                 ressource.freigeben(o.op_name)
 
         konflikt = None
         for o, neuer_start, neuer_ende in neue_zeiten:
-            for ressource in o.geblockte_ressourcen:
-                frei = ressource.ist_verfuegbar(neuer_start, neuer_ende)
+            for ressource, menge in o.geblockte_ressourcen:
+                frei = ressource.ist_verfuegbar(neuer_start, neuer_ende, menge)
                 if not frei:
                     konflikt = f"Verschiebung nicht möglich: Ressource für '{o.op_name}' ist zur neuen Zeit ({neuer_start}-{neuer_ende}) belegt!"
                     break
@@ -213,10 +213,10 @@ class OPManager:
         if konflikt:
             # Nichts geht mehr: alte Zeiten der Ressourcen wiederherstellen und abbrechen
             for o, _, _ in neue_zeiten:
-                for ressource in o.geblockte_ressourcen:
-                    ressource.blockieren(o.op_name, o.start_minute, o.end_minute)
+                for ressource, menge in o.geblockte_ressourcen:
+                    ressource.blockieren(o.op_name, o.start_minute, o.end_minute, menge)
             raise ValueError(konflikt)
-
+        
         # Alles passt: Änderung endgültig übernehmen
         richtung = "kürzer" if verschiebung < 0 else "länger"
         print(f"\n[Anpassung] '{op_name}' wird um {abs(verschiebung)} Min. {richtung} (neues Ende: {neue_end_minute}).")
@@ -224,11 +224,11 @@ class OPManager:
         for o, neuer_start, neuer_ende in neue_zeiten:
             o.start_minute = neuer_start
             o.end_minute = neuer_ende
-            for ressource in o.geblockte_ressourcen:
-                ressource.blockieren(o.op_name, neuer_start, neuer_ende)
+            for ressource, menge in o.geblockte_ressourcen:
+                ressource.blockieren(o.op_name, neuer_start, neuer_ende, menge)
             if o is not op:
                 print(f"  -> '{o.op_name}' verschoben auf {neuer_start}-{neuer_ende}")
-
+                
         saal.geplante_ops.sort(key=lambda x: x.start_minute)
         print(f"Neue Restzeit in {saal_id}: {saal.berechne_restzeit()} Minuten.")
 
