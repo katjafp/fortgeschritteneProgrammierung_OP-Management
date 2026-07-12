@@ -21,12 +21,12 @@ def baue_orthopaedie_klinik() -> OPManager:
     """
     manager = OPManager()
 
-    # 1. OP-Säle
+    # OP-Säle
     manager.saal_hinzufuegen("Saal_1_Endoprothetik", kapazitaet=480)  # 08:00-16:00
     manager.saal_hinzufuegen("Saal_2_Wirbelsaeule", kapazitaet=480)   # 08:00-16:00
     manager.saal_hinzufuegen("Saal_3_Ambulant", kapazitaet=360)       # 08:00-14:00
 
-    # 2. Personal: reine Funktionsbezeichnung
+    # Personal: reine Funktionsbezeichnung
     personal = {
         "Operateur Endoprothetik": 3,
         "Operateur Wirbelsäule": 2,
@@ -41,24 +41,25 @@ def baue_orthopaedie_klinik() -> OPManager:
             manager.ressource_registrieren(RessourcenPool(name=name, anzahl=anzahl))
 
 
-    # 3. Geräte
+    # Geräte
+    manager.ressource_registrieren(RessourcenPool(name="C-Bogen", anzahl=2))
     geraete = ["C-Bogen", "Navigationssystem", "Arthroskopie-Turm"]
     for name in geraete:
         manager.ressource_registrieren(Ressource(name=name))
-
-    # 4. Chirurgische Siebe (Instrument = Ressource + Sterilisationszeit)
+    
+    # Chirurgische Siebe (Instrument = Ressource + Sterilisationszeit)
     siebe = ["Knie-TEP-Sieb", "Hüft-TEP-Sieb", "Wirbelsäulen-Sieb",
              "Schulter-Arthroskopie-Sieb", "Sprunggelenk-Sieb"]
     for name in siebe:
         manager.ressource_registrieren(Instrument(name=name))
 
-    # 5. Einmalartikel / Verbrauchsmaterial (mit Lager & Meldebestand)
+    # Einmalartikel / Verbrauchsmaterial (mit Lager & Meldebestand)
     manager.ressource_registrieren(Einmalartikel(name="Knochenzement Palacos", bestand=20, meldebestand=5))
     manager.ressource_registrieren(Einmalartikel(name="Nahtmaterial Vicryl 3-0", bestand=50, meldebestand=10))
     manager.ressource_registrieren(Einmalartikel(name="Schrauben-Set Wirbelsäule", bestand=6, meldebestand=2))
     manager.ressource_registrieren(Einmalartikel(name="Fadenanker Schulter", bestand=15, meldebestand=4))
 
-    # 6. OP-Typen ("Rezepte": Dauer + benötigte Ressourcen)
+    # OP-Typen ("Rezepte": Dauer + benötigte Ressourcen)
     manager.op_typ_definieren(OPTyp(
         op_name="Knie-TEP",
         standard_dauer=120,
