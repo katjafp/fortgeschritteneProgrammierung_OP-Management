@@ -53,6 +53,11 @@ class Einmalartikel(Ressource):
     """Erbt von Ressource und verwaltet Bestände und Meldebestände für Verbrauchsmaterialien."""
     def __init__(self, name: str, bestand: int, meldebestand: int):
         super().__init__(name)
+        if bestand < 0:
+            raise ValueError(f"Fehler: Bestand darf nicht negativ sein (erhalten: {bestand}).")
+        if meldebestand < 0:
+            raise ValueError(f"Fehler: Meldebestand darf nicht negativ sein (erhalten: {meldebestand}).")
+        
         self.bestand: int = bestand
         self.meldebestand: int = meldebestand
 
@@ -71,7 +76,7 @@ class Einmalartikel(Ressource):
             print(f"Warnung! Meldebestand für '{self.name}' unterschritten! Aktueller Bestand: {self.bestand}")
 
 class RessourcenPool(Ressource):
-    """Erbt von Ressource. Bildet mehrere GLEICHARTIGE Einheiten ab (z.B. 3 Operateure
+    """Erbt von Ressource. Bildet mehrere gleichartige Einheiten ab (z.B. 3 Operateure
     derselben Fachrichtung), die als eine gemeinsame Ressource verwaltet werden.
 
     Statt 'frei oder belegt' (wie bei der Basisklasse) wird gezählt, wie viele

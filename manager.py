@@ -59,6 +59,13 @@ class OPManager:
         """
         print(f"\n[Buchung] Starte Planung für '{op_name}' ({op_typ_name}) in {saal_id} ab Minute {start_minute}")
 
+        for saal in self.saele.values():
+            if any(o.op_name == op_name for o in saal.geplante_ops):
+                raise ValueError(f"Fehler: Der Bezeichner '{op_name}' ist bereits vergeben. Bitte eindeutigen Namen wählen.")
+            
+        if not isinstance(start_minute, int):
+            raise ValueError(f"Fehler: Startminute muss eine ganze Zahl sein (erhalten: {start_minute!r}).")
+
         if start_minute < 0:
             raise ValueError(f"Fehler: Startminute muss 0 oder positiv sein (erhalten: {start_minute}).")
 

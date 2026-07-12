@@ -42,7 +42,7 @@ def baue_orthopaedie_klinik() -> OPManager:
 
 
     # 3. Geräte
-    geraete = ["C-Bogen Saal 1", "Navigationssystem Saal 2", "Arthroskopie-Turm Saal 3", "C-Bogen Saal 3"]
+    geraete = ["C-Bogen", "Navigationssystem", "Arthroskopie-Turm"]
     for name in geraete:
         manager.ressource_registrieren(Ressource(name=name))
 
@@ -66,7 +66,7 @@ def baue_orthopaedie_klinik() -> OPManager:
             "Operateur Endoprothetik": 1,
             "Anästhesist": 1,
             "OP-Pflege": 2,
-            "C-Bogen Saal 1": 1,
+            "C-Bogen": 1,
             "Knie-TEP-Sieb": 1,
             "Knochenzement Palacos": 2,
             "Nahtmaterial Vicryl 3-0": 4,
@@ -79,7 +79,7 @@ def baue_orthopaedie_klinik() -> OPManager:
             "Operateur Endoprothetik": 1,
             "Anästhesist": 1,
             "OP-Pflege": 1,
-            "C-Bogen Saal 1": 1,
+            "C-Bogen": 1,
             "Hüft-TEP-Sieb": 1,
             "Knochenzement Palacos": 2,
             "Nahtmaterial Vicryl 3-0": 4,
@@ -92,7 +92,7 @@ def baue_orthopaedie_klinik() -> OPManager:
             "Operateur Wirbelsäule": 1,
             "Anästhesist": 1,
             "OP-Pflege": 1,
-            "Navigationssystem Saal 2": 1,
+            "Navigationssystem": 1,
             "Wirbelsäulen-Sieb": 1,
             "Schrauben-Set Wirbelsäule": 1,
             "Nahtmaterial Vicryl 3-0": 5,
@@ -105,7 +105,7 @@ def baue_orthopaedie_klinik() -> OPManager:
             "Operateur Schulter/Fuß": 1,
             "Anästhesist": 1,
             "OP-Pflege": 1,
-            "Arthroskopie-Turm Saal 3": 1,
+            "Arthroskopie-Turm": 1,
             "Schulter-Arthroskopie-Sieb": 1,
             "Fadenanker Schulter": 2,
             "Nahtmaterial Vicryl 3-0": 2,
@@ -118,7 +118,7 @@ def baue_orthopaedie_klinik() -> OPManager:
             "Operateur Schulter/Fuß": 1,
             "Anästhesist": 1,
             "OP-Pflege": 1,
-            "C-Bogen Saal 3": 1,
+            "C-Bogen": 1,
             "Sprunggelenk-Sieb": 1,
             "Nahtmaterial Vicryl 3-0": 3,
         }
