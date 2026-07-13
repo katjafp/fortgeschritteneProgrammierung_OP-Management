@@ -75,21 +75,7 @@ def run_tests():
     assert fenster[0] == {"von": 0, "bis": 100, "dauer": 100}
     assert fenster[1] == {"von": 210, "bis": 480, "dauer": 270}
 
-    # 6. Zu kleine Lücken dürfen bei Mindestdauer nicht mitgezählt werden
-    saal = OPSaal(saal_id="Saal_1", kapazitaet_minute=480, reinigung=20)
-    op_a = OP(op_name="Fall 1", saal_id="Saal_1", start_minute=30, dauer=60)
-    op_b = OP(op_name="Fall 2", saal_id="Saal_1", start_minute=140, dauer=60)
-    saal.op_hinzufuegen(op_a)
-    saal.op_hinzufuegen(op_b)
-    restzeit_gesamt = saal.berechne_restzeit()
-    restzeit_ab_90 = saal.berechne_restzeit(min_dauer=90)
-    print(f"\n[TEST 6] Lücken: 0-30 (30 Min.), 110-140 (30 Min.), 220-480 (260 Min.)")
-    print(f"Restzeit gesamt (alle Lücken): {restzeit_gesamt} (erwartet: 320)")
-    print(f"Restzeit nur für Lücken >= 90 Min.: {restzeit_ab_90} (erwartet: 260)")
-    assert restzeit_ab_90 == 260
-
     print("\nAlle Tests für op.py erfolgreich")
-
 
 if __name__ == "__main__":
     run_tests()

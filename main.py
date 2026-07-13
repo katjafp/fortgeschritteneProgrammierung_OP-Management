@@ -36,8 +36,16 @@ def main() -> None:
         ("Fischer, Schulter li.", "Schulter-Arthroskopie", "Saal_3_Ambulant", 0),
         ("Wagner, Sprunggelenk", "Sprunggelenk-Arthrodese", "Saal_3_Ambulant", 80),
     ]
-    ergebnisse = manager.plane_mehrere_operationen(geplante_buchungen)
+    ergebnisse = []
+    for op_name, op_typ_name, saal_id, start_minute in geplante_buchungen:
+        try:
+            manager.plane_operation(op_name, op_typ_name, saal_id, start_minute=start_minute)
+            ergebnisse.append({"op_name": op_name, "erfolgreich": True})
+        except ValueError as e:
+            ergebnisse.append({"op_name": op_name, "erfolgreich": False, "fehler": str(e)})
     fehlgeschlagen = [e for e in ergebnisse if not e["erfolgreich"]]
+
+
     if fehlgeschlagen:
         print(f"\n{len(fehlgeschlagen)} von {len(ergebnisse)} Buchungen fehlgeschlagen:")
         for e in fehlgeschlagen:
@@ -68,8 +76,8 @@ def main() -> None:
     print("-> Ursprünglicher Zeitplan bleibt vollständig erhalten (kein Teil-Zustand).")
 
     #Meldebestand-Warnung provozieren
-    print("Zusätzlicher Verbrauch von 3x 'Schrauben-Set Wirbelsäule' (Nachlieferung simulieren)...")
-    manager.lager["Schrauben-Set Wirbelsäule"].konsumiere(3)
+    print("Zusätzlicher Verbrauch von 3x 'Knochenzement Palacos' (Nachlieferung simulieren)...")
+    manager.lager["Knochenzement Palacos"].konsumiere(3)
 
     #Tagesabschluss - finaler Zeitplan aller Säle
     zeige_tagesplan(manager)
