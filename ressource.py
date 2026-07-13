@@ -15,19 +15,25 @@ class Ressource:
         #geplante OPs für Ressource mit Zeitstempel
         self.geplante_ops: list[dict]=[]
 
-    def ist_verfuegbar(self, von_minute: int, bis_minute: int) -> bool:
+    def ist_verfuegbar(self, von_minute: int, bis_minute: int, menge: int = 1) -> bool:
         """Frei, wenn sich kein bereits gebuchter Zeitraum mit dem angefragten überschneidet."""
         for op in self.geplante_ops:
             if von_minute < op["bis"] and bis_minute > op["von"]:
                 return False
         return True
-
+    
     def blockieren(self, op_name: str, von_minute: int, bis_minute: int, menge: int = 1) -> None:
-        karteikarte = {"name": op_name, "von": von_minute, "bis": bis_minute, "menge": menge}
+        """Reserviert die Ressource für eine bestimmte Operation."""
+        karteikarte = {
+            "name": op_name,
+            "von": von_minute,
+            "bis": bis_minute,
+            "menge": menge
+        }
         self.geplante_ops.append(karteikarte)
 
     def freigeben(self, op_name:str) -> None:
-        """Macht die Ressource nach der OP wieder für das System verfügbar."""
+        """Freigen der Ressourcen bei Aufruf."""
         self.geplante_ops = [op for op in self.geplante_ops if op["name"] != op_name]
 
 
@@ -37,12 +43,11 @@ class Instrument(Ressource):
     
     sterilisationsdauer: int = 60  # Minuten Sterilisation nach jeder Nutzung
 
-    def blockieren(self, op_name: str, von_minute: int, bis_minute: int) -> None:
+    def blockieren(self, op_name: str, von_minute: int, bis_minute: int, menge: int = 1) -> None:
         """Reserviert das Sieb für eine OP - inkl. der anschließenden 
         Sterilisationszeit. Dadurch zeigt ist_verfuegbar() automatisch erst 
         NACH der Sterilisation wieder 'frei' an."""
-        super().blockieren(op_name, von_minute, bis_minute + self.sterilisationsdauer)
-
+        super().blockieren(op_name, von_minute, bis_minute + self.sterilisationsdauer, menge)
 
 class Einmalartikel(Ressource):
     """Erbt von Ressource und verwaltet Bestände und Meldebestände für Verbrauchsmaterialien."""
@@ -81,8 +86,8 @@ class RessourcenPool(Ressource):
         self.anzahl: int = anzahl
 
     def ist_verfuegbar(self, von_minute: int, bis_minute: int, menge: int = 1) -> bool:
-        """Frei, wenn zu keinem Zeitpunkt mehr als 'anzahl' Buchungen gleichzeitig
-        aktiv wären (inkl. der neuen, testweise hinzugefügten Anfrage)."""
+        """Frei, wenn zu keinem Zeitpunkt mehr Einheiten gleichzeitig gebunden
+        wären als 'anzahl' (inkl. der neuen, testweise hinzugefügten Anfrage)."""
         alle = [(op["von"], op["bis"], op["menge"]) for op in self.geplante_ops] + [(von_minute, bis_minute, menge)]
         for start, _, _ in alle:
             aktive = sum(m for von, bis, m in alle if von <= start < bis)

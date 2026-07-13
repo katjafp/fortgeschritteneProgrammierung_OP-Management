@@ -20,7 +20,6 @@ def zeige_tagesplan(manager) -> None:
             bis = minute_zu_uhrzeit(op.end_minute)
             print(f"  {von}-{bis} Uhr: {op.op_name}")
 
-
 def main() -> None:
     # Klinik-Setup (Säle, Personal, Geräte, Siebe, Lager, OP-Typen)
     manager = baue_orthopaedie_klinik()
@@ -37,14 +36,12 @@ def main() -> None:
         ("Fischer, Schulter li.", "Schulter-Arthroskopie", "Saal_3_Ambulant", 0),
         ("Wagner, Sprunggelenk", "Sprunggelenk-Arthrodese", "Saal_3_Ambulant", 80),
     ]
-    for op_name, op_typ_name, saal_id, start_minute in geplante_buchungen:
-        try:
-            manager.plane_operation(op_name, op_typ_name, saal_id, start_minute=start_minute)
-        except ValueError as e:
-            print(f"Buchung für '{op_name}' fehlgeschlagen: {e}")
-    print("\nTagesplan nach den Erstbuchungen")
-    zeige_tagesplan(manager)
-
+    ergebnisse = manager.plane_mehrere_operationen(geplante_buchungen)
+    fehlgeschlagen = [e for e in ergebnisse if not e["erfolgreich"]]
+    if fehlgeschlagen:
+        print(f"\n{len(fehlgeschlagen)} von {len(ergebnisse)} Buchungen fehlgeschlagen:")
+        for e in fehlgeschlagen:
+            print(f"  - '{e['op_name']}': {e['fehler']}")    
     # Ressourcenkonflikt provozieren
     print("Versuch: eine 2. Knie-OP in Saal 1, während der Operateur Endoprothetik bereits operiert")
     try:
