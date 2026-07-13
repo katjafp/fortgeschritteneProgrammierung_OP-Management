@@ -18,6 +18,13 @@ def minute_zu_uhrzeit(minute: int, schichtbeginn: str = "08:00") -> str:
     rest_minute = gesamt_minuten % 60
     return f"{stunde:02d}:{rest_minute:02d}"
 
+def uhrzeit_zu_minute(uhrzeit: "datetime.time", schichtbeginn: str = "08:00") -> int:
+    """Wandelt eine Uhrzeit (datetime.time) in eine Minute relativ zum Schichtbeginn um."""
+    start_stunde, start_minute_offset = map(int, schichtbeginn.split(":"))
+    gesamt_minuten_uhrzeit = uhrzeit.hour * 60 + uhrzeit.minute
+    gesamt_minuten_schichtbeginn = start_stunde * 60 + start_minute_offset
+    return gesamt_minuten_uhrzeit - gesamt_minuten_schichtbeginn
+
 class OP:
     """Repräsentiert eine konkret geplante Operation auf dem Zeitstrahl."""
     def __init__(self, op_name: str, saal_id: str, start_minute: int, dauer: int):
@@ -35,7 +42,6 @@ class OPTyp:
         self.op_name: str = op_name
         self.standard_dauer: int = standard_dauer
         self.benoetigte_ressourcen: dict[str, int] = benoetigte_ressourcen
-
 
 class OPSaal:
     """Verwaltet einen OP-Saal, dessen Auslastung und die zeitliche Reihenfolge."""
@@ -72,26 +78,24 @@ class OPSaal:
             })
         return fenster
 
-    def berechne_restzeit(self, min_dauer: int = 0) -> int:
+    def berechne_restzeit(self) -> int:
         """
         Berechnet die verbleibenden freien Minuten im Saal.
         Mit min_dauer werden realistische Zeitfenster identifiziert in die 
         tatsächlich eine OP geplant werden kann.
         """
         fenster = self.finde_freie_fenster()
-        return sum(f["dauer"] for f in fenster if f["dauer"] >= min_dauer)
+        return sum(f["dauer"] for f in fenster)
 
     def op_hinzufuegen(self, neue_op: OP) -> None:
         """Prüft, ob eine neue OP zeitlich exakt in eine der freien Lücken passt."""        
-        # überprüft, ob OP in Zeit bis Saal-Ende passt
-        if neue_op.end_minute + self.reinigung > self.kapazitaet_minute:
-            raise ValueError(f"Fehler: OP überschreitet die Schließzeit von {self.saal_id}!")
+        fenster = self.finde_freie_fenster()
+        passt = any(
+            f["von"] <= neue_op.start_minute and neue_op.end_minute + self.reinigung <= f["bis"]
+            for f in fenster
+        )
+        if not passt:
+            raise ValueError(f"Zeitkonflikt in {self.saal_id}: OP passt in keine freie Lücke!")
 
-        # Überschneidungsprüfung mit bereits geplanten OPs
-        for op in self.geplante_ops:
-            op_ende_mit_reinigung = op.end_minute + self.reinigung
-            if not (neue_op.end_minute + self.reinigung <= op.start_minute or neue_op.start_minute >= op_ende_mit_reinigung):
-                raise ValueError(f"Zeitkonflikt in {self.saal_id}: Zeitraum überschneidet sich!")
-        
         self.geplante_ops.append(neue_op)
         self.geplante_ops.sort(key=lambda x: x.start_minute)

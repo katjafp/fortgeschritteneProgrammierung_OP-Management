@@ -2,9 +2,9 @@
 Datei: app.py
 Streamlit-Oberfläche für das digitale OP-Planungs- & Ressourcenmanagement.
 """
-
+import datetime
 import streamlit as st 
-from op import minute_zu_uhrzeit
+from op import minute_zu_uhrzeit, uhrzeit_zu_minute
 from klinik_setup import baue_orthopaedie_klinik
 
 if "manager" not in st.session_state:
@@ -47,20 +47,23 @@ with st.form("op_buchen_formular"):
     op_name = st.text_input("Bezeichnung dieser Buchung (z.B. Patientenname/Fall)")
     op_typ_name = st.selectbox("OP-Typ", options=list(manager.op_typen.keys()))
     saal_id = st.selectbox("Saal", options=list(manager.saele.keys()))
-    start_minute = st.number_input("Startminute (0 = Schichtbeginn)", min_value=0, step=10)
+    uhrzeit = st.time_input("Startzeit", value=datetime.time(8, 0), step=600)  # step=600s = 10 Min.
 
     abschicken = st.form_submit_button("OP einplanen")
 
     if abschicken:
+        start_minute = uhrzeit_zu_minute(uhrzeit)
         if not op_name:
             st.error("Bitte eine Bezeichnung für die Buchung eingeben.")
+        elif start_minute < 0:
+            st.error("Startzeit darf nicht vor Schichtbeginn (08:00) liegen.")
         else:
             try:
                 manager.plane_operation(
                     op_name=op_name,
                     op_typ_name=op_typ_name,
                     saal_id=saal_id,
-                    start_minute=int(start_minute)
+                    start_minute=start_minute
                 )
                 st.success(f"'{op_name}' erfolgreich in {saal_id} eingeplant!")
                 st.rerun()
