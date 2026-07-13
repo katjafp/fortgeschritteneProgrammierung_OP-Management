@@ -41,6 +41,21 @@ for name, artikel in manager.lager.items():
         else:
             col2.success("Bestand ausreichend")
 
+        col3, col4 = st.columns([2, 1])
+        nachliefer_menge = col3.number_input(
+            "Nachliefermenge", min_value=1, value=5, step=1,
+            key=f"nachliefer_menge_{name}", label_visibility="collapsed"
+        )
+        if col4.button("Nachliefern", key=f"nachliefer_button_{name}"):
+            manager.lager_material_ein(name, int(nachliefer_menge))
+            st.session_state.lager_erfolg = f"{int(nachliefer_menge)} Stück '{name}' nachgeliefert."
+            st.rerun()
+
+# Erfolgsmeldung nach einem Rerun anzeigen (übersteht den Neustart des Skripts)
+if "lager_erfolg" in st.session_state:
+    st.success(st.session_state.lager_erfolg)
+    del st.session_state.lager_erfolg
+
 st.header("Neue OP buchen")
 
 with st.form("op_buchen_formular"):
@@ -65,10 +80,15 @@ with st.form("op_buchen_formular"):
                     saal_id=saal_id,
                     start_minute=start_minute
                 )
-                st.success(f"'{op_name}' erfolgreich in {saal_id} eingeplant!")
+                st.session_state.buchung_erfolg = f"'{op_name}' erfolgreich in {saal_id} eingeplant!"
                 st.rerun()
             except ValueError as e:
                 st.error(str(e))
+
+# Erfolgsmeldung nach einem Rerun anzeigen (übersteht den Neustart des Skripts)
+if "buchung_erfolg" in st.session_state:
+    st.success(st.session_state.buchung_erfolg)
+    del st.session_state.buchung_erfolg
 
 st.header("OP verschieben / Dauer anpassen")
 
@@ -101,7 +121,12 @@ else:
     if st.button("Anpassung übernehmen"):
         try:
             manager.verschiebe_op(gewaehlter_saal_id, gewaehlte_op.op_name, int(neue_dauer))
-            st.success(f"'{gewaehlte_op.op_name}' erfolgreich angepasst!")
+            st.session_state.verschiebung_erfolg = f"'{gewaehlte_op.op_name}' erfolgreich angepasst!"
             st.rerun()
         except ValueError as e:
             st.error(str(e))
+
+# Erfolgsmeldung nach einem Rerun anzeigen (übersteht den Neustart des Skripts)
+if "verschiebung_erfolg" in st.session_state:
+    st.success(st.session_state.verschiebung_erfolg)
+    del st.session_state.verschiebung_erfolg

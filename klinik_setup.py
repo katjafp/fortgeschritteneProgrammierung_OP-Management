@@ -55,7 +55,7 @@ def baue_orthopaedie_klinik() -> OPManager:
     # Einmalartikel / Verbrauchsmaterial (mit Lager & Meldebestand)
     manager.ressource_registrieren(Einmalartikel(name="Knochenzement Palacos", bestand=20, meldebestand=5))
     manager.ressource_registrieren(Einmalartikel(name="Nahtmaterial Vicryl 3-0", bestand=50, meldebestand=10))
-    manager.ressource_registrieren(Einmalartikel(name="Schrauben-Set Wirbelsäule", bestand=6, meldebestand=2))
+    manager.ressource_registrieren(Einmalartikel(name="Schrauben-Set Wirbelsäule", bestand=1, meldebestand=2)) #Trigger gesetzt für Präsentation
     manager.ressource_registrieren(Einmalartikel(name="Fadenanker Schulter", bestand=15, meldebestand=4))
 
     # OP-Typen ("Rezepte": Dauer + benötigte Ressourcen)
