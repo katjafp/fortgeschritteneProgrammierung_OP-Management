@@ -7,7 +7,7 @@ Operationen (OP) sowie die OP-Säle (OPSaal), inklusive Berechnung von
 freien, zusammenhängenden Zeitfenstern unter Berücksichtigung 
 der Reinigungszeiten.
 """
-
+import datetime
 from ressource import Ressource
 
 def minute_zu_uhrzeit(minute: int, schichtbeginn: str = "08:00") -> str:
